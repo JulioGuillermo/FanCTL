@@ -7,17 +7,28 @@ struct ContentView: View {
     @State private var connectionStatus: String = "No iniciado"
     @State private var isConnected: Bool = false
     @State private var selectedSensor: SensorInfo? = nil
-    @State private var filterCategory: SensorCategory? = nil
     @State private var isScanning: Bool = false
     @State private var autoRefreshEnabled: Bool = true
+
+    @StateObject private var sensorSelector = SensorSelectionController()
 
     // Timer para refresco continuo en vivo (ideal para Mac mini sin Sandbox)
     private let timer = Timer.publish(every: 2.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
         HStack(spacing: 0) {
-            // Panel Izquierdo: Control de Estado y Ventiladores
-            LeftPanelFansView(
+            // Panel Izquierdo (pequeño): Sensores Térmicos con selección
+            LeftPanelSensorsView(
+                sensors: sensors,
+                selector: sensorSelector,
+                selectedSensor: $selectedSensor
+            )
+            .frame(width: 330)
+
+            Divider()
+
+            // Panel Derecho (expansible): Estado de Conexión y Ventiladores
+            RightPanelFansView(
                 fans: fans,
                 isConnected: isConnected,
                 connectionStatus: connectionStatus,
@@ -25,19 +36,9 @@ struct ContentView: View {
                 autoRefreshEnabled: $autoRefreshEnabled,
                 onRefresh: refreshSensors
             )
-            .frame(width: 330)
-
-            Divider()
-
-            // Panel Derecho: Sensores Térmicos M4 y Metadatos
-            RightPanelSensorsView(
-                sensors: sensors,
-                filterCategory: $filterCategory,
-                selectedSensor: $selectedSensor
-            )
-            .frame(minWidth: 450)
+            .frame(minWidth: 450, maxWidth: .infinity)
         }
-        .frame(minWidth: 800, minHeight: 580)
+        .frame(minWidth: 900, minHeight: 580)
         .onAppear {
             refreshSensors()
         }
@@ -57,6 +58,7 @@ struct ContentView: View {
 
         let snapshot = SensorsReader().readAll()
         self.sensors = snapshot.sensors
+        sensorSelector.updateSensors(snapshot.sensors)
         self.fans = snapshot.fans
         self.isConnected = snapshot.connectionOk
         self.connectionStatus = snapshot.connectionOk ? "Conectado (Sin Sandbox)" : "Error de Conexión"
@@ -66,8 +68,95 @@ struct ContentView: View {
     }
 }
 
-/// Panel lateral izquierdo enfocado en el estado de conexión y lista de ventiladores
-struct LeftPanelFansView: View {
+/// Panel izquierdo compacto con la lista de sensores térmicos seleccionables
+struct LeftPanelSensorsView: View {
+    let sensors: [SensorInfo]
+    @ObservedObject var selector: SensorSelectionController
+    @Binding var selectedSensor: SensorInfo?
+
+    private var maxTempText: String {
+        guard let max = selector.maxTemperature else { return "—" }
+        return String(format: "%.1f °C", max)
+    }
+
+    private var maxTempColor: Color {
+        guard let max = selector.maxTemperature else { return .secondary }
+        if max < 45 { return .green }
+        if max < 65 { return .orange }
+        return .red
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Encabezado de la Sección de Sensores
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Sensores Térmicos")
+                    .font(.title3)
+                    .bold()
+                Text("Acceso IOKit directo")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal)
+            .padding(.top)
+
+            // Máxima temperatura de los seleccionados + acciones
+            HStack(spacing: 8) {
+                Label(maxTempText, systemImage: "thermometer.high")
+                    .font(.system(.body, design: .monospaced))
+                    .bold()
+                    .foregroundColor(maxTempColor)
+
+                Spacer()
+
+                Button("Todo") { selector.selectAll() }
+                Button("Ninguno") { selector.selectNone() }
+            }
+            .font(.caption)
+            .padding(.horizontal)
+
+            Divider()
+
+            // Lista limpia de Sensores Térmicos con selección
+            if !sensors.isEmpty {
+                List(sensors, id: \.id) { sensor in
+                    SensorRowView(
+                        sensor: sensor,
+                        isSelected: selector.isSelected(sensor),
+                        onToggleSelection: { selector.toggle(sensor) },
+                        onTapDetails: { selectedSensor = sensor }
+                    )
+                }
+                .listStyle(.plain)
+            } else {
+                VStack(spacing: 12) {
+                    Spacer()
+                    Image(systemName: "thermometer.medium")
+                        .font(.system(size: 40))
+                        .foregroundColor(.secondary)
+                    Text("Sin datos de sensores")
+                        .font(.headline)
+                    Text("Haz clic en 'Reescanear Ahora' para detectar lecturas térmicas.")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+
+            // Contador de selección
+            Text("\(selector.selectedCount) / \(sensors.count) seleccionados")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+                .padding(.horizontal)
+                .padding(.bottom, 6)
+        }
+        .background(Color.secondary.opacity(0.04))
+    }
+}
+
+/// Panel derecho principal y expansible con el estado y los ventiladores
+struct RightPanelFansView: View {
     let fans: [FanInfo]
     let isConnected: Bool
     let connectionStatus: String
@@ -114,7 +203,7 @@ struct LeftPanelFansView: View {
 
             Divider()
 
-            // Lista de Ventiladores
+            // Lista de Ventiladores (ocupa todo el espacio disponible)
             if !fans.isEmpty {
                 ScrollView {
                     VStack(spacing: 12) {
@@ -179,112 +268,12 @@ struct LeftPanelFansView: View {
     }
 }
 
-/// Panel principal derecho con la lista de sensores térmicos, filtros y badges
-struct RightPanelSensorsView: View {
-    let sensors: [SensorInfo]
-    @Binding var filterCategory: SensorCategory?
-    @Binding var selectedSensor: SensorInfo?
-
-    var filteredSensors: [SensorInfo] {
-        if let filter = filterCategory {
-            return sensors.filter { $0.category == filter }
-        }
-        return sensors
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            // Encabezado de la Sección de Sensores
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Sensores Térmicos M4")
-                        .font(.title2)
-                        .bold()
-                    Text("Acceso IOKit directo sin restricciones de Sandbox")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-
-                Text("\(sensors.count) activos")
-                    .font(.caption)
-                    .bold()
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(Color.blue.opacity(0.12))
-                    .foregroundColor(.blue)
-                    .cornerRadius(8)
-            }
-            .padding(.horizontal)
-            .padding(.top)
-
-            // Selector de Filtros por Categoría
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    Button(action: { filterCategory = nil }) {
-                        Text("Todos (\(sensors.count))")
-                            .font(.caption)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(filterCategory == nil ? Color.blue : Color.secondary.opacity(0.12))
-                            .foregroundColor(filterCategory == nil ? .white : .primary)
-                            .cornerRadius(8)
-                    }
-
-                    ForEach(SensorCategory.allCases, id: \.self) { cat in
-                        let count = sensors.filter { $0.category == cat }.count
-                        if count > 0 {
-                            Button(action: { filterCategory = cat }) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: cat.iconName)
-                                    Text("\(cat.rawValue) (\(count))")
-                                }
-                                .font(.caption)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(filterCategory == cat ? Color.blue : Color.secondary.opacity(0.12))
-                                .foregroundColor(filterCategory == cat ? .white : .primary)
-                                .cornerRadius(8)
-                            }
-                        }
-                    }
-                }
-                .padding(.horizontal)
-            }
-
-            // Lista de Sensores Térmicos
-            if !filteredSensors.isEmpty {
-                List(filteredSensors, id: \.id) { sensor in
-                    SensorRowView(sensor: sensor)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            selectedSensor = sensor
-                        }
-                }
-                .listStyle(.plain)
-            } else {
-                VStack(spacing: 12) {
-                    Spacer()
-                    Image(systemName: "thermometer.medium")
-                        .font(.system(size: 40))
-                        .foregroundColor(.secondary)
-                    Text("Sin datos de sensores")
-                        .font(.headline)
-                    Text("Haz clic en 'Reescanear Ahora' para detectar lecturas térmicas.")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        }
-    }
-}
-
-/// Fila individual para renderizar cada sensor térmico con su valor y metadatos rápidos
+/// Fila individual para cada sensor térmico con checkbox de selección
 struct SensorRowView: View {
     let sensor: SensorInfo
+    var isSelected: Bool
+    var onToggleSelection: () -> Void
+    var onTapDetails: () -> Void
 
     private var temperatureColor: Color {
         if sensor.value < 45 { return .green }
@@ -293,50 +282,43 @@ struct SensorRowView: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
+            // Checkbox de selección
+            Button(action: onToggleSelection) {
+                Image(systemName: isSelected ? "checkmark.square.fill" : "square")
+                    .font(.title3)
+                    .foregroundColor(isSelected ? .blue : .secondary)
+            }
+            .buttonStyle(.plain)
+
             Image(systemName: sensor.category.iconName)
                 .foregroundColor(.blue)
                 .font(.title3)
-                .frame(width: 28)
+                .frame(width: 24)
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(sensor.rawKey)
                     .font(.system(.body, design: .monospaced))
                     .bold()
+                    .strikethrough(!isSelected, color: .secondary)
 
-                HStack(spacing: 6) {
-                    Text(sensor.source.rawValue)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-
-                    Text("•")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-
-                    Text(sensor.thermalZone ?? "PMU Zone")
-                        .font(.caption2)
-                        .bold()
-                        .foregroundColor(.blue)
-                }
+                Text(sensor.source.rawValue)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
             }
 
             Spacer()
 
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(String(format: "%.1f °C", sensor.value))
-                    .font(.system(.title3, design: .monospaced))
-                    .bold()
-                    .foregroundColor(temperatureColor)
-
-                HStack(spacing: 2) {
-                    Text("Metadatos")
-                    Image(systemName: "info.circle")
-                }
-                .font(.caption2)
-                .foregroundColor(.secondary)
-            }
+            Text(String(format: "%.1f °C", sensor.value))
+                .font(.system(.body, design: .monospaced))
+                .bold()
+                .foregroundColor(temperatureColor)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onTapDetails()
+        }
     }
 }
 
