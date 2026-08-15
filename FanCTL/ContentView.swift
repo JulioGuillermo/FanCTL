@@ -42,6 +42,7 @@ struct ContentView: View {
                 connectionStatus: connectionStatus,
                 controlActive: fanController.canControlHardware,
                 controlError: daemonClient.lastError,
+                isRequestingPermissions: daemonClient.isRequestingPermissions,
                 modeFor: mode(for:),
                 desiredRPMFor: desiredRPM(for:),
                 manualRPMFor: manualRPM(for:),
@@ -261,6 +262,7 @@ struct RightPanelFansView: View {
     let connectionStatus: String
     let controlActive: Bool
     let controlError: String?
+    let isRequestingPermissions: Bool
     let modeFor: (FanInfo) -> FanMode
     let desiredRPMFor: (FanInfo) -> Double
     let manualRPMFor: (FanInfo) -> Double
@@ -354,6 +356,7 @@ struct RightPanelFansView: View {
                     Button("Activar permisos") { onRequestControl() }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.small)
+                        .disabled(isRequestingPermissions)
                 }
                 .padding(10)
                 .background(Color.orange.opacity(0.12))
@@ -366,6 +369,17 @@ struct RightPanelFansView: View {
                         .font(.caption2)
                         .foregroundColor(.orange)
                         .padding(.horizontal)
+                }
+
+                if isRequestingPermissions {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Solicitando permisos de administrador…")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal)
                 }
             }
 
@@ -380,6 +394,7 @@ struct RightPanelFansView: View {
                                 desiredRPM: desiredRPMFor(fan),
                                 manualRPM: manualRPMFor(fan),
                                 controlActive: controlActive,
+                                isRequestingPermissions: isRequestingPermissions,
                                 onChangeMode: { onChangeMode(fan, $0) },
                                 onManualRPMChange: { onManualRPMChange(fan, $0) },
                                 onRequestControl: onRequestControl,

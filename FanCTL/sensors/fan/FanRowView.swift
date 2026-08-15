@@ -7,6 +7,7 @@ struct FanRowView: View {
     var desiredRPM: Double? = nil
     var manualRPM: Double = 1500
     var controlActive: Bool = false
+    var isRequestingPermissions: Bool = false
     var onChangeMode: (FanMode) -> Void = { _ in }
     var onManualRPMChange: (Double) -> Void = { _ in }
     var onRequestControl: () -> Void = {}
@@ -111,9 +112,18 @@ struct FanRowView: View {
                     Spacer()
 
                     if !controlActive {
-                        Button("Activar control") { onRequestControl() }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
+                        if isRequestingPermissions {
+                            HStack(spacing: 6) {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text("Solicitando permisos…")
+                            }
+                            .font(.caption2)
+                        } else {
+                            Button("Activar control") { onRequestControl() }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                        }
                     }
                 }
                 .font(.caption2)

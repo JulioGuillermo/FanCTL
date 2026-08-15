@@ -16,6 +16,7 @@ final class FanDaemonClient: ObservableObject {
     @Published private(set) var isAvailable = false
     @Published private(set) var daemonStatus: SMAppService.Status = .notRegistered
     @Published private(set) var lastError: String?
+    @Published private(set) var isRequestingPermissions = false
 
     private var connection: NSXPCConnection?
     private var stopRequested = false
@@ -113,13 +114,20 @@ final class FanDaemonClient: ObservableObject {
         PrivilegedInstaller.install { [weak self] ok, message in
             DispatchQueue.main.async {
                 guard let self else { return }
+                self.isRequestingPermissions = false
                 if ok {
                     self.lastError = nil
                     self.stopRequested = false
                     self.refreshStatus()
                     // La carga del daemon es asíncrona; intentar conectar tras un momento.
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-                        self?.connect()
+                        guard let self else { return }
+                        self.connect()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                            if !self.isAvailable {
+                                self.lastError = "Daemon instalado, pero no responde. Reintenta la conexión o revisa el log del daemon."
+                            }
+                        }
                     }
                 } else {
                     self.lastError = message ?? "No se pudo instalar el daemon."
@@ -138,9 +146,13 @@ final class FanDaemonClient: ObservableObject {
             stopRequested = false
             lastError = nil
             connect()
-        } else {
-            startDaemon()
+            return
         }
+        guard !isRequestingPermissions else { return }
+        isRequestingPermissions = true
+        lastError = nil
+        AppLog.log("[DaemonClient] Solicitando permisos de administrador…")
+        startDaemon()
     }
 
     /// Pide al daemon que termine y corta la conexión. No desinstala el daemon

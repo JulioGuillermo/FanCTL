@@ -19,7 +19,11 @@ enum PrivilegedInstaller {
     /// Instala el binario del daemon (desde `Contents/Helpers/FanDaemon`),
     /// escribe el plist de launchd y arranca el servicio como root.
     static func install(completion: @escaping (_ ok: Bool, _ message: String?) -> Void) {
-        guard let source = Bundle.main.url(forAuxiliaryExecutable: "FanDaemon") else {
+        let candidates = [
+            Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/FanDaemon"),
+            Bundle.main.bundleURL.appendingPathComponent("Contents/MacOS/FanDaemon")
+        ]
+        guard let source = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0.path) }) else {
             completion(false, "No se encontró el binario del daemon dentro de la app.")
             return
         }
@@ -93,13 +97,41 @@ enum PrivilegedInstaller {
     private static func runAsRoot(script: String,
                                   completion: @escaping (_ ok: Bool, _ message: String?) -> Void) {
         DispatchQueue.global(qos: .userInitiated).async {
-            let output = PrivilegedExec.runPrivilegedShellScript(script)
-            let ok = output != nil
+            let escaped = script
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "\"", with: "\\\"")
+            let appleScript = "do shell script \"\(escaped)\" with administrator privileges"
+
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+            process.arguments = ["-e", appleScript]
+            let outPipe = Pipe()
+            let errPipe = Pipe()
+            process.standardOutput = outPipe
+            process.standardError = errPipe
+
+            do {
+                try process.run()
+            } catch {
+                DispatchQueue.main.async {
+                    completion(false, "No se pudo ejecutar la instalación: \(error.localizedDescription)")
+                }
+                return
+            }
+            process.waitUntilExit()
+
+            let output = String(data: outPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            let errorText = String(data: errPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
             DispatchQueue.main.async {
-                if ok {
+                if process.terminationStatus == 0 {
                     completion(true, output)
                 } else {
-                    completion(false, PrivilegedExec.lastError ?? "No se pudo ejecutar la operación privilegiada.")
+                    let message = errorText.isEmpty
+                        ? "La instalación no se completó (código \(process.terminationStatus))."
+                        : errorText
+                    completion(false, message)
                 }
             }
         }

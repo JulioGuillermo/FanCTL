@@ -4,5 +4,4 @@
 
 #import <Foundation/Foundation.h>
 #import "consts/TemperatureBridge.h"
-#import "PrivilegedExec.h"
 

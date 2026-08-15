@@ -117,9 +117,24 @@ struct GeneralSettingsView: View {
             }
 
             Spacer()
+
+            HStack {
+                Spacer()
+                Text("FanCTL · compilada \(buildDateText)")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
         }
         .padding()
         .frame(width: 460)
+    }
+
+    private var buildDateText: String {
+        guard let url = Bundle.main.executableURL,
+              let mtime = try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate else {
+            return "desconocida"
+        }
+        return mtime.formatted(date: .abbreviated, time: .shortened)
     }
 
     private var statusText: String {
