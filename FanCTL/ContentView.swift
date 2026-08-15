@@ -30,6 +30,7 @@ struct ContentView: View {
             // Panel Derecho (expansible): Estado de Conexión y Ventiladores
             RightPanelFansView(
                 fans: fans,
+                systemInfo: SystemInfo.shared,
                 isConnected: isConnected,
                 connectionStatus: connectionStatus,
                 isScanning: isScanning,
@@ -158,6 +159,7 @@ struct LeftPanelSensorsView: View {
 /// Panel derecho principal y expansible con el estado y los ventiladores
 struct RightPanelFansView: View {
     let fans: [FanInfo]
+    let systemInfo: SystemInfo
     let isConnected: Bool
     let connectionStatus: String
     let isScanning: Bool
@@ -166,15 +168,20 @@ struct RightPanelFansView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Encabezado del Panel adaptado a Mac mini
+            // Encabezado del Panel con el equipo real detectado
             VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Image(systemName: "macmini.fill")
-                        .font(.title2)
+                HStack(spacing: 10) {
+                    Image(systemName: systemInfo.type.iconName)
+                        .font(.system(size: 30))
                         .foregroundColor(.blue)
-                    Text("Mac mini • SMC")
-                        .font(.title3)
-                        .bold()
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(systemInfo.type.rawValue)
+                            .font(.title3)
+                            .bold()
+                        Text("\(systemInfo.computerName) • \(systemInfo.modelIdentifier)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
 
                 // Indicador de Estado y Sandbox
