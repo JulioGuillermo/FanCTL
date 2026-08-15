@@ -9,6 +9,8 @@ import SwiftUI
 
 @main
 struct FanCTLApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     @StateObject private var daemonClient: FanDaemonClient
     @StateObject private var fanController: FanController
     @StateObject private var hardwareMonitor: HardwareMonitor

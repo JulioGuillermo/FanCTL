@@ -70,12 +70,11 @@ struct ContentView: View {
                 refreshSensors()
             }
         }
-        .onChange(of: scenePhase) { oldValue, newValue in
-            // Al salir, devolver el control de los ventiladores al sistema
-            if newValue != .active {
-                restoreSystemControl()
-            }
+        .onChange(of: scenePhase) { _, _ in
+            // Al cerrar la ventana la app se oculta a la barra de menú y el
+            // control continúa. Solo el cierre real (Cmd+Q) restaura el sistema.
         }
+        .background(WindowCloseHider())
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
             restoreSystemControl()
         }
