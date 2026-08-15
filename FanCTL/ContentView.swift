@@ -6,6 +6,7 @@ struct ContentView: View {
 
     @EnvironmentObject private var daemonClient: FanDaemonClient
     @EnvironmentObject private var fanController: FanController
+    @EnvironmentObject private var hardwareMonitor: HardwareMonitor
 
     @State private var sensors: [SensorInfo] = []
     @State private var fans: [FanInfo] = []
@@ -29,7 +30,7 @@ struct ContentView: View {
                 sensors: sensors,
                 selectedSensor: $selectedSensor
             )
-            .frame(width: 330)
+            .frame(minWidth: 330, maxWidth: 380)
 
             Divider()
 
@@ -42,15 +43,19 @@ struct ContentView: View {
                 controlActive: fanController.canControlHardware,
                 modeFor: mode(for:),
                 desiredRPMFor: desiredRPM(for:),
+                manualRPMFor: manualRPM(for:),
                 onChangeMode: { fan, mode in
                     changeMode(mode, for: fan)
+                },
+                onManualRPMChange: { fan, rpm in
+                    changeManualRPM(rpm, for: fan)
                 },
                 onGeneralSettings: { showingGeneralSettings = true },
                 onFanSettings: { settingsFan = $0 }
             )
             .frame(minWidth: 450, maxWidth: .infinity)
         }
-        .frame(minWidth: 900, minHeight: 580)
+        .frame(minWidth: 960, minHeight: 640)
         .onAppear {
             fanController.checkPrivileges()
             refreshSensors()
@@ -110,11 +115,22 @@ struct ContentView: View {
         }
     }
 
+    private func manualRPM(for fan: FanInfo) -> Double {
+        let config = settingsStore.fanSettings(for: fan)
+        return min(max(config.manualRPM, fan.minRPM), fan.maxRPM)
+    }
+
     private func changeMode(_ mode: FanMode, for fan: FanInfo) {
         var config = settingsStore.fanSettings(for: fan)
         config.mode = mode
         settingsStore.updateFanSettings(config)
         AppLog.log("[Content] Fan \(fan.id) modo → \(mode.rawValue)")
+    }
+
+    private func changeManualRPM(_ rpm: Double, for fan: FanInfo) {
+        var config = settingsStore.fanSettings(for: fan)
+        config.manualRPM = min(max(rpm, fan.minRPM), fan.maxRPM)
+        settingsStore.updateFanSettings(config)
     }
 
     private func applyFanControl() {
@@ -144,6 +160,7 @@ struct ContentView: View {
         self.fans = snapshot.fans
         self.isConnected = snapshot.connectionOk
         self.connectionStatus = snapshot.connectionOk ? "Conectado" : "Error de Conexión"
+        hardwareMonitor.update(sensors: snapshot.sensors, fans: snapshot.fans)
         AppLog.log("[Content] Sensores totales: \(snapshot.sensors.count), Ventiladores: \(snapshot.fans.count), connectionOk: \(snapshot.connectionOk)")
 
         isScanning = false
@@ -209,6 +226,7 @@ struct LeftPanelSensorsView: View {
                     )
                 }
                 .listStyle(.plain)
+                .frame(minHeight: 240)
             } else {
                 VStack(spacing: 12) {
                     Spacer()
@@ -238,7 +256,9 @@ struct RightPanelFansView: View {
     let controlActive: Bool
     let modeFor: (FanInfo) -> FanMode
     let desiredRPMFor: (FanInfo) -> Double
+    let manualRPMFor: (FanInfo) -> Double
     let onChangeMode: (FanInfo, FanMode) -> Void
+    let onManualRPMChange: (FanInfo, Double) -> Void
     let onGeneralSettings: () -> Void
     let onFanSettings: (FanInfo) -> Void
 
@@ -318,8 +338,10 @@ struct RightPanelFansView: View {
                                 fan: fan,
                                 mode: modeFor(fan),
                                 desiredRPM: desiredRPMFor(fan),
+                                manualRPM: manualRPMFor(fan),
                                 controlActive: controlActive,
                                 onChangeMode: { onChangeMode(fan, $0) },
+                                onManualRPMChange: { onManualRPMChange(fan, $0) },
                                 onSettings: { onFanSettings(fan) }
                             )
                         }
@@ -466,4 +488,5 @@ struct MetaRow: View {
     return ContentView()
         .environmentObject(daemon)
         .environmentObject(FanController(daemon: daemon))
+        .environmentObject(HardwareMonitor())
 }

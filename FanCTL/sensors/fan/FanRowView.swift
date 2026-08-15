@@ -1,12 +1,14 @@
 import SwiftUI
 
-/// Componente de interfaz de usuario para mostrar un ventilador individual
+/// Componente de interfaz de usuario para mostrar y controlar un ventilador.
 struct FanRowView: View {
     let fan: FanInfo
     var mode: FanMode = .automatic
     var desiredRPM: Double? = nil
+    var manualRPM: Double = 1500
     var controlActive: Bool = false
     var onChangeMode: (FanMode) -> Void = { _ in }
+    var onManualRPMChange: (Double) -> Void = { _ in }
     var onSettings: () -> Void = {}
 
     var body: some View {
@@ -19,33 +21,6 @@ struct FanRowView: View {
                 Text(fan.name)
                     .bold()
                     .font(.body)
-
-                // Selector rápido de modo
-                Menu {
-                    ForEach(FanMode.allCases, id: \.self) { candidate in
-                        Button {
-                            onChangeMode(candidate)
-                        } label: {
-                            Label(candidate.rawValue, systemImage: candidate.iconName)
-                            if candidate == mode {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: mode.iconName)
-                        Text(mode.rawValue)
-                    }
-                    .font(.caption)
-                    .bold()
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(Color.secondary.opacity(0.12))
-                    .cornerRadius(6)
-                }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
 
                 Spacer()
 
@@ -67,6 +42,43 @@ struct FanRowView: View {
                 }
                 .buttonStyle(.plain)
                 .help("Ajustes de \(fan.name)")
+            }
+
+            // Selector de modo de control (visible y directo)
+            Picker("Modo", selection: Binding(
+                get: { mode },
+                set: { onChangeMode($0) }
+            )) {
+                ForEach(FanMode.allCases, id: \.self) { candidate in
+                    Label(candidate.rawValue, systemImage: candidate.iconName)
+                        .tag(candidate)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+
+            // Slider de velocidad manual
+            if mode == .manual {
+                HStack(spacing: 10) {
+                    Text("Velocidad")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    Slider(
+                        value: Binding(
+                            get: { manualRPM },
+                            set: { onManualRPMChange($0) }
+                        ),
+                        in: fan.minRPM...max(fan.minRPM, fan.maxRPM),
+                        step: 50
+                    )
+
+                    Text("\(Int(manualRPM))")
+                        .font(.system(.body, design: .monospaced))
+                        .bold()
+                        .monospacedDigit()
+                        .frame(width: 56, alignment: .trailing)
+                }
             }
 
             GeometryReader { geo in
@@ -149,6 +161,7 @@ struct FanRowView: View {
             ),
             mode: .automatic,
             desiredRPM: 4000,
+            manualRPM: 3000,
             controlActive: true
         )
         
@@ -160,13 +173,14 @@ struct FanRowView: View {
                 minRPM: 1200,
                 maxRPM: 6500,
                 targetRPM: 5200,
-                mode: .automatic
+                mode: .manual
             ),
             mode: .manual,
             desiredRPM: 3000,
-            controlActive: false
+            manualRPM: 3000,
+            controlActive: true
         )
     }
     .padding()
-    .frame(width: 420)
+    .frame(width: 480)
 }

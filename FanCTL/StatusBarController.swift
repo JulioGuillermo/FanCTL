@@ -4,17 +4,20 @@ internal import Combine
 /// Gestiona el indicador de la barra de menú.
 ///
 /// El icono aparece únicamente mientras el daemon privilegiado está activo y
-/// muestra el estado de los ventiladores (RPM aplicadas) con acciones rápidas.
+/// muestra la temperatura máxima y las RPM de los ventiladores junto al icono,
+/// además de un menú con acciones rápidas.
 final class StatusBarController: ObservableObject {
     private var statusItem: NSStatusItem?
     private let daemon: FanDaemonClient
     private let fanController: FanController
+    private let monitor: HardwareMonitor
     private let menuTarget = AppMenuTarget()
     private var cancellables = Set<AnyCancellable>()
 
-    init(daemon: FanDaemonClient, fanController: FanController) {
+    init(daemon: FanDaemonClient, fanController: FanController, monitor: HardwareMonitor) {
         self.daemon = daemon
         self.fanController = fanController
+        self.monitor = monitor
 
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = item.button {
@@ -34,7 +37,15 @@ final class StatusBarController: ObservableObject {
             .sink { [weak self] available in
                 guard let self else { return }
                 self.statusItem?.isVisible = available
-                if available { self.updateMenu() }
+                self.updateStatusTitle()
+            }
+            .store(in: &cancellables)
+
+        // Texto junto al icono: temp máxima y RPM de cada ventilador.
+        Publishers.CombineLatest(monitor.$maxTemperature, monitor.$fanSpeeds)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _, _ in
+                self?.updateStatusTitle()
             }
             .store(in: &cancellables)
 
@@ -47,12 +58,35 @@ final class StatusBarController: ObservableObject {
             .store(in: &cancellables)
     }
 
+    private func updateStatusTitle() {
+        guard let button = statusItem?.button else { return }
+        guard daemon.isAvailable else {
+            button.title = ""
+            return
+        }
+
+        var parts: [String] = []
+        if let max = monitor.maxTemperature {
+            parts.append(String(format: "%.1f°C", max))
+        }
+        let rpmValues = monitor.fanSpeeds.keys.sorted().compactMap { monitor.fanSpeeds[$0] }
+        if !rpmValues.isEmpty {
+            let rpmText = rpmValues.map { String(Int($0)) }.joined(separator: "/")
+            parts.append("\(rpmText) RPM")
+        }
+        button.title = parts.joined(separator: "  ")
+    }
+
     private func updateMenu() {
         guard let statusItem else { return }
         let menu = NSMenu()
         menu.autoenablesItems = false
 
-        let header = NSMenuItem(title: "FanCTL — Daemon activo", action: nil, keyEquivalent: "")
+        var headerTitle = "FanCTL — Daemon activo"
+        if let max = monitor.maxTemperature {
+            headerTitle += String(format: " · %.1f°C", max)
+        }
+        let header = NSMenuItem(title: headerTitle, action: nil, keyEquivalent: "")
         header.isEnabled = false
         menu.addItem(header)
 

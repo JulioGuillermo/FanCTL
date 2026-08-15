@@ -11,14 +11,17 @@ import SwiftUI
 struct FanCTLApp: App {
     @StateObject private var daemonClient: FanDaemonClient
     @StateObject private var fanController: FanController
+    @StateObject private var hardwareMonitor: HardwareMonitor
     @StateObject private var statusBar: StatusBarController
 
     init() {
         let daemon = FanDaemonClient()
         let fan = FanController(daemon: daemon)
+        let monitor = HardwareMonitor()
         _daemonClient = StateObject(wrappedValue: daemon)
         _fanController = StateObject(wrappedValue: fan)
-        _statusBar = StateObject(wrappedValue: StatusBarController(daemon: daemon, fanController: fan))
+        _hardwareMonitor = StateObject(wrappedValue: monitor)
+        _statusBar = StateObject(wrappedValue: StatusBarController(daemon: daemon, fanController: fan, monitor: monitor))
     }
 
     var body: some Scene {
@@ -26,6 +29,7 @@ struct FanCTLApp: App {
             ContentView()
                 .environmentObject(daemonClient)
                 .environmentObject(fanController)
+                .environmentObject(hardwareMonitor)
         }
     }
 }
