@@ -5,19 +5,25 @@ internal import Combine
 struct FanSettings: Codable, Equatable, Identifiable {
     var id: Int
     var name: String
+    /// Modo de control seleccionado por el usuario.
+    var mode: FanMode
     /// Temperatura máxima (°C) que se desea mantener en los sensores seleccionados.
     var maxTemperature: Double
     /// Temperatura mínima (°C) que se desea mantener en los sensores seleccionados.
     var minTemperature: Double
     /// Identificadores de los sensores que controlan este ventilador.
     var selectedSensorKeys: [String]
+    /// Velocidad fija en RPM para el modo manual.
+    var manualRPM: Double
 
-    init(id: Int, name: String, maxTemperature: Double = 90, minTemperature: Double = 30, selectedSensorKeys: [String] = []) {
+    init(id: Int, name: String, mode: FanMode = .automatic, maxTemperature: Double = 90, minTemperature: Double = 30, selectedSensorKeys: [String] = [], manualRPM: Double = 1500) {
         self.id = id
         self.name = name
+        self.mode = mode
         self.maxTemperature = maxTemperature
         self.minTemperature = minTemperature
         self.selectedSensorKeys = selectedSensorKeys
+        self.manualRPM = manualRPM
     }
 }
 

@@ -77,6 +77,41 @@ final class SMCClient {
         return SMCDatum(bytes: bytes, type: dataType, size: dataSize)
     }
 
+    /// Escribe datos crudos en una clave del SMC (ej. "F0Md", "F0Mn").
+    /// - Parameters:
+    ///   - key: Nombre de la clave de 4 caracteres.
+    ///   - bytes: Datos a escribir (tamaño según el tipo de la clave).
+    /// - Returns: `true` si la escritura se completó correctamente.
+    @discardableResult
+    func writeKeyData(_ key: String, bytes: [UInt8]) -> Bool {
+        let keyCode = FourCharCode.fromString(key)
+
+        var inputInfo = SMCParamStruct()
+        var outputInfo = SMCParamStruct()
+
+        inputInfo.key = keyCode
+        inputInfo.data8 = SMCConstants.commandGetKeyInfo
+
+        guard callStruct(input: &inputInfo, output: &outputInfo) else { return false }
+
+        let dataSize = Int(outputInfo.keyInfo.dataSize)
+        guard dataSize > 0 else { return false }
+
+        var inputWrite = SMCParamStruct()
+        var outputWrite = SMCParamStruct()
+
+        inputWrite.key = keyCode
+        inputWrite.data8 = SMCConstants.commandWriteBytes
+        inputWrite.keyInfo.dataSize = outputInfo.keyInfo.dataSize
+
+        let count = min(bytes.count, dataSize)
+        withUnsafeMutableBytes(of: &inputWrite.bytes) { raw in
+            raw.baseAddress?.copyMemory(from: bytes, byteCount: count)
+        }
+
+        return callStruct(input: &inputWrite, output: &outputWrite)
+    }
+
     private func callStruct(input: inout SMCParamStruct, output: inout SMCParamStruct) -> Bool {
         let inputSize = MemoryLayout<SMCParamStruct>.stride
         var outputSize = MemoryLayout<SMCParamStruct>.stride

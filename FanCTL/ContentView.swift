@@ -2,6 +2,8 @@ import SwiftUI
 internal import Combine
 
 struct ContentView: View {
+    @Environment(\.scenePhase) private var scenePhase
+
     @State private var sensors: [SensorInfo] = []
     @State private var fans: [FanInfo] = []
     @State private var connectionStatus: String = "No iniciado"
@@ -13,6 +15,7 @@ struct ContentView: View {
     @State private var lastRefresh: Date = .distantPast
 
     @StateObject private var settingsStore = SettingsStore()
+    @StateObject private var fanController = FanController()
 
     // Ticker de 0.5s para respetar el intervalo configurado de reescaneo
     private let ticker = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
@@ -34,7 +37,12 @@ struct ContentView: View {
                 systemInfo: SystemInfo.shared,
                 isConnected: isConnected,
                 connectionStatus: connectionStatus,
-                fanCalculation: fanCalculation(for:),
+                controlActive: fanController.canControlHardware,
+                modeFor: mode(for:),
+                desiredRPMFor: desiredRPM(for:),
+                onChangeMode: { fan, mode in
+                    changeMode(mode, for: fan)
+                },
                 onGeneralSettings: { showingGeneralSettings = true },
                 onFanSettings: { settingsFan = $0 }
             )
@@ -42,6 +50,7 @@ struct ContentView: View {
         }
         .frame(minWidth: 900, minHeight: 580)
         .onAppear {
+            fanController.checkPrivileges()
             refreshSensors()
         }
         .onReceive(ticker) { _ in
@@ -50,6 +59,15 @@ struct ContentView: View {
             if Date().timeIntervalSince(lastRefresh) >= interval {
                 refreshSensors()
             }
+        }
+        .onChange(of: scenePhase) { oldValue, newValue in
+            // Al salir, devolver el control de los ventiladores al sistema
+            if newValue != .active {
+                restoreSystemControl()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+            restoreSystemControl()
         }
         .sheet(item: $selectedSensor) { sensor in
             SensorDetailView(sensor: sensor)
@@ -62,9 +80,47 @@ struct ContentView: View {
         }
     }
 
-    private func fanCalculation(for fan: FanInfo) -> FanSpeedCalculation {
+    private func mode(for fan: FanInfo) -> FanMode {
+        settingsStore.fanSettings(for: fan).mode
+    }
+
+    private func desiredRPM(for fan: FanInfo) -> Double {
         let config = settingsStore.fanSettings(for: fan)
-        return FanSpeedCalculation.compute(fan: fan, config: config, sensors: sensors)
+        switch config.mode {
+        case .automatic:
+            let calc = FanSpeedCalculation.compute(fan: fan, config: config, sensors: sensors)
+            return calc.targetRPM ?? fan.minRPM
+        case .manual:
+            return min(max(config.manualRPM, fan.minRPM), fan.maxRPM)
+        case .off:
+            return fan.minRPM
+        case .maximum:
+            return fan.maxRPM
+        }
+    }
+
+    private func changeMode(_ mode: FanMode, for fan: FanInfo) {
+        var config = settingsStore.fanSettings(for: fan)
+        config.mode = mode
+        settingsStore.updateFanSettings(config)
+        AppLog.log("[Content] Fan \(fan.id) modo → \(mode.rawValue)")
+    }
+
+    private func applyFanControl() {
+        guard !fans.isEmpty else { return }
+        for fan in fans {
+            let config = settingsStore.fanSettings(for: fan)
+            let desired = desiredRPM(for: fan)
+            fanController.setSpeed(desired, toFan: fan.id)
+            AppLog.log("[Content] F\(fan.id) modo=\(config.mode.rawValue) objetivo=\(Int(desired)) RPM")
+        }
+    }
+
+    private func restoreSystemControl() {
+        guard !fans.isEmpty else { return }
+        for fan in fans {
+            fanController.restoreSystemControl(toFan: fan.id)
+        }
     }
 
     private func refreshSensors() {
@@ -80,6 +136,7 @@ struct ContentView: View {
         AppLog.log("[Content] Sensores totales: \(snapshot.sensors.count), Ventiladores: \(snapshot.fans.count), connectionOk: \(snapshot.connectionOk)")
 
         isScanning = false
+        applyFanControl()
     }
 }
 
@@ -167,7 +224,10 @@ struct RightPanelFansView: View {
     let systemInfo: SystemInfo
     let isConnected: Bool
     let connectionStatus: String
-    let fanCalculation: (FanInfo) -> FanSpeedCalculation
+    let controlActive: Bool
+    let modeFor: (FanInfo) -> FanMode
+    let desiredRPMFor: (FanInfo) -> Double
+    let onChangeMode: (FanInfo, FanMode) -> Void
     let onGeneralSettings: () -> Void
     let onFanSettings: (FanInfo) -> Void
 
@@ -212,14 +272,25 @@ struct RightPanelFansView: View {
 
                     Spacer()
 
-                    Text("Direct Access")
-                        .font(.caption2)
-                        .bold()
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.green.opacity(0.15))
-                        .foregroundColor(.green)
-                        .cornerRadius(4)
+                    if controlActive {
+                        Text("Control activo")
+                            .font(.caption2)
+                            .bold()
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.blue.opacity(0.15))
+                            .foregroundColor(.blue)
+                            .cornerRadius(4)
+                    } else {
+                        Text("Control requiere root")
+                            .font(.caption2)
+                            .bold()
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.orange.opacity(0.15))
+                            .foregroundColor(.orange)
+                            .cornerRadius(4)
+                    }
                 }
             }
             .padding(.horizontal)
@@ -232,9 +303,14 @@ struct RightPanelFansView: View {
                 ScrollView {
                     VStack(spacing: 12) {
                         ForEach(fans) { fan in
-                            FanRowView(fan: fan, calculation: fanCalculation(fan)) {
-                                onFanSettings(fan)
-                            }
+                            FanRowView(
+                                fan: fan,
+                                mode: modeFor(fan),
+                                desiredRPM: desiredRPMFor(fan),
+                                controlActive: controlActive,
+                                onChangeMode: { onChangeMode(fan, $0) },
+                                onSettings: { onFanSettings(fan) }
+                            )
                         }
                     }
                     .padding(.horizontal)

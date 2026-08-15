@@ -45,79 +45,90 @@ struct FanSettingsView: View {
 
             Divider()
 
-            // Rango de temperatura a mantener
+            // Modo de control
             VStack(alignment: .leading, spacing: 8) {
-                Text("Temperaturas a mantener")
+                Text("Modo de control")
                     .font(.headline)
 
-                temperatureRow(label: "Temp máxima (°C)", value: $config.maxTemperature)
-                temperatureRow(label: "Temp mínima (°C)", value: $config.minTemperature)
+                Picker("Modo", selection: $config.mode) {
+                    ForEach(FanMode.allCases, id: \.self) { candidate in
+                        Label(candidate.rawValue, systemImage: candidate.iconName)
+                            .tag(candidate)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
 
-                Text("Por debajo de la mínima la velocidad es mínima; por encima de la máxima, máxima.")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                switch config.mode {
+                case .automatic:
+                    Text("Velocidad calculada a partir de la temperatura máxima de los sensores seleccionados.")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                case .manual:
+                    manualSpeedSection
+                        .padding(.top, 4)
+                case .off:
+                    Text("Ventilador fijado a la velocidad mínima (los ventiladores no pueden apagarse del todo).")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                case .maximum:
+                    Text("Ventilador fijado a la velocidad máxima.")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
             }
 
             Divider()
 
-            // Sensores que controlan este ventilador
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("Sensores que controlan este ventilador")
+            // Rango de temperatura a mantener (solo aplica en modo Auto)
+            if config.mode == .automatic {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Temperaturas a mantener")
                         .font(.headline)
-                    Spacer()
-                    Button("Todo") { selectAll() }
-                    Button("Ninguno") { config.selectedSensorKeys = [] }
-                }
-                .font(.caption)
 
-                if !sensors.isEmpty {
-                    List(sensors, id: \.id) { sensor in
-                        SensorSelectionRow(
-                            sensor: sensor,
-                            isSelected: config.selectedSensorKeys.contains(sensor.id),
-                            onToggle: { toggle(sensor) }
-                        )
-                    }
-                    .listStyle(.plain)
-                    .frame(maxHeight: 280)
-                } else {
-                    Text("Sin sensores detectados.")
-                        .font(.caption)
+                    temperatureRow(label: "Temp máxima (°C)", value: $config.maxTemperature)
+                    temperatureRow(label: "Temp mínima (°C)", value: $config.minTemperature)
+
+                    Text("Por debajo de la mínima la velocidad es mínima; por encima de la máxima, máxima.")
+                        .font(.caption2)
                         .foregroundColor(.secondary)
+                }
+
+                Divider()
+
+                // Sensores que controlan este ventilador
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Sensores que controlan este ventilador")
+                            .font(.headline)
+                        Spacer()
+                        Button("Todo") { selectAll() }
+                        Button("Ninguno") { config.selectedSensorKeys = [] }
+                    }
+                    .font(.caption)
+
+                    if !sensors.isEmpty {
+                        List(sensors, id: \.id) { sensor in
+                            SensorSelectionRow(
+                                sensor: sensor,
+                                isSelected: config.selectedSensorKeys.contains(sensor.id),
+                                onToggle: { toggle(sensor) }
+                            )
+                        }
+                        .listStyle(.plain)
+                        .frame(maxHeight: 240)
+                    } else {
+                        Text("Sin sensores detectados.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
 
             Divider()
 
             // Resumen del cálculo
-            HStack(spacing: 10) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Sensores: \(selectedCount)/\(sensors.count)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    if let maxTemp = calculation.maxSelectedTemperature {
-                        Text(String(format: "Máx: %.1f °C", maxTemp))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(String(format: "Normalizado: %.0f%%", calculation.normalizedValue * 100))
-                        .font(.caption)
-                        .bold()
-                    if let target = calculation.targetRPM {
-                        Text("Velocidad objetivo: \(Int(target)) RPM")
-                            .font(.caption)
-                            .bold()
-                            .foregroundColor(.blue)
-                    }
-                }
-            }
-            .padding(10)
-            .background(Color.secondary.opacity(0.08))
-            .cornerRadius(8)
+            summarySection
         }
         .padding()
         .frame(width: 500, height: 640)
@@ -125,6 +136,9 @@ struct FanSettingsView: View {
             // Por defecto, si no hay selección guardada, seleccionar todos los sensores
             if config.selectedSensorKeys.isEmpty && !sensors.isEmpty {
                 config.selectedSensorKeys = sensors.map(\.id)
+            }
+            if config.manualRPM < fan.minRPM || config.manualRPM > fan.maxRPM {
+                config.manualRPM = fan.minRPM + (fan.maxRPM - fan.minRPM) * 0.3
             }
         }
         .onChange(of: config.maxTemperature) { oldValue, newValue in
@@ -139,6 +153,87 @@ struct FanSettingsView: View {
         }
         .onChange(of: config) { oldValue, newValue in
             store.updateFanSettings(newValue)
+        }
+    }
+
+    private var manualSpeedSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Velocidad fija")
+                    .foregroundColor(.secondary)
+                Spacer()
+                TextField("RPM", value: Binding(
+                    get: { config.manualRPM },
+                    set: { config.manualRPM = min(max($0, fan.minRPM), fan.maxRPM) }
+                ), format: .number)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 80)
+                    .multilineTextAlignment(.trailing)
+            }
+
+            Slider(
+                value: Binding(
+                    get: { config.manualRPM },
+                    set: { config.manualRPM = $0 }
+                ),
+                in: fan.minRPM...max(fan.minRPM, fan.maxRPM),
+                step: 50
+            )
+
+            Text("Rango del ventilador: \(Int(fan.minRPM)) – \(Int(fan.maxRPM)) RPM")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+    }
+
+    private var summarySection: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                if config.mode == .automatic {
+                    Text("Sensores: \(selectedCount)/\(sensors.count)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    if let maxTemp = calculation.maxSelectedTemperature {
+                        Text(String(format: "Máx: %.1f °C", maxTemp))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                } else {
+                    Text("Modo: \(config.mode.rawValue)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 2) {
+                if config.mode == .automatic {
+                    Text(String(format: "Normalizado: %.0f%%", calculation.normalizedValue * 100))
+                        .font(.caption)
+                        .bold()
+                }
+                if let target = summaryTargetRPM {
+                    Text("Velocidad objetivo: \(Int(target)) RPM")
+                        .font(.caption)
+                        .bold()
+                        .foregroundColor(.blue)
+                }
+            }
+        }
+        .padding(10)
+        .background(Color.secondary.opacity(0.08))
+        .cornerRadius(8)
+    }
+
+    private var summaryTargetRPM: Double? {
+        switch config.mode {
+        case .automatic:
+            return calculation.targetRPM
+        case .manual:
+            return config.manualRPM
+        case .off:
+            return fan.minRPM
+        case .maximum:
+            return fan.maxRPM
         }
     }
 

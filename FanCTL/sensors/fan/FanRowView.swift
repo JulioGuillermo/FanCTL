@@ -3,7 +3,10 @@ import SwiftUI
 /// Componente de interfaz de usuario para mostrar un ventilador individual
 struct FanRowView: View {
     let fan: FanInfo
-    var calculation: FanSpeedCalculation? = nil
+    var mode: FanMode = .automatic
+    var desiredRPM: Double? = nil
+    var controlActive: Bool = false
+    var onChangeMode: (FanMode) -> Void = { _ in }
     var onSettings: () -> Void = {}
 
     var body: some View {
@@ -16,6 +19,33 @@ struct FanRowView: View {
                 Text(fan.name)
                     .bold()
                     .font(.body)
+
+                // Selector rápido de modo
+                Menu {
+                    ForEach(FanMode.allCases, id: \.self) { candidate in
+                        Button {
+                            onChangeMode(candidate)
+                        } label: {
+                            Label(candidate.rawValue, systemImage: candidate.iconName)
+                            if candidate == mode {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: mode.iconName)
+                        Text(mode.rawValue)
+                    }
+                    .font(.caption)
+                    .bold()
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.secondary.opacity(0.12))
+                    .cornerRadius(6)
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
 
                 Spacer()
 
@@ -58,23 +88,21 @@ struct FanRowView: View {
             }
             .frame(height: 8)
 
-            // Resumen del control calculado a partir de los sensores seleccionados
-            if let calc = calculation, let maxTemp = calc.maxSelectedTemperature, let target = calc.targetRPM {
+            // Velocidad que se está aplicando según el modo
+            if let desired = desiredRPM {
                 HStack {
-                    Label(String(format: "Máx: %.1f °C", maxTemp), systemImage: "thermometer")
-                        .foregroundColor(.secondary)
+                    Label(String(format: "Control: %d RPM", Int(desired)), systemImage: mode.iconName)
+                        .bold()
+                        .foregroundColor(controlActive ? .blue : .secondary)
 
                     Spacer()
 
-                    Text("Control: \(Int(target)) RPM")
-                        .bold()
-                        .foregroundColor(.blue)
-
-                    Spacer()
-
-                    Text(String(format: "%.0f%%", calc.normalizedValue * 100))
-                        .bold()
-                        .foregroundColor(.secondary)
+                    if !controlActive {
+                        Text("Requiere root")
+                            .font(.caption2)
+                            .bold()
+                            .foregroundColor(.orange)
+                    }
                 }
                 .font(.caption2)
             }
@@ -109,29 +137,35 @@ struct FanRowView: View {
 
 #Preview {
     VStack(spacing: 12) {
-        FanRowView(fan: FanInfo(
-            id: 0,
-            name: "Ventilador Principal",
-            currentRPM: 2450,
-            minRPM: 1200,
-            maxRPM: 6500,
-            targetRPM: 2450,
-            mode: .automatic
-        ), calculation: FanSpeedCalculation(
-            maxSelectedTemperature: 62.0,
-            normalizedValue: 0.53,
-            targetRPM: 4000
-        ))
+        FanRowView(
+            fan: FanInfo(
+                id: 0,
+                name: "Ventilador Principal",
+                currentRPM: 2450,
+                minRPM: 1200,
+                maxRPM: 6500,
+                targetRPM: 2450,
+                mode: .automatic
+            ),
+            mode: .automatic,
+            desiredRPM: 4000,
+            controlActive: true
+        )
         
-        FanRowView(fan: FanInfo(
-            id: 1,
-            name: "Ventilador Secundario (GPU)",
-            currentRPM: 5100,
-            minRPM: 1200,
-            maxRPM: 6500,
-            targetRPM: 5200,
-            mode: .automatic
-        ))
+        FanRowView(
+            fan: FanInfo(
+                id: 1,
+                name: "Ventilador Secundario (GPU)",
+                currentRPM: 5100,
+                minRPM: 1200,
+                maxRPM: 6500,
+                targetRPM: 5200,
+                mode: .automatic
+            ),
+            mode: .manual,
+            desiredRPM: 3000,
+            controlActive: false
+        )
     }
     .padding()
     .frame(width: 420)

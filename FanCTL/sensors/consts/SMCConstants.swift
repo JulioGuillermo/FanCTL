@@ -13,6 +13,9 @@ enum SMCConstants {
     /// Comando SMC para leer los datos de una clave (tras `GET_KEY_INFO`).
     static let commandReadBytes: UInt8 = 5
 
+    /// Comando SMC para escribir los datos de una clave.
+    static let commandWriteBytes: UInt8 = 6
+
     /// Comando SMC para obtener la información de una clave (tamaño y tipo).
     static let commandGetKeyInfo: UInt8 = 9
 
