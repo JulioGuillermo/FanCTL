@@ -12,10 +12,6 @@ struct GeneralSettingsView: View {
 
     private let intervalOptions: [Double] = [0.5, 1, 2, 3, 5, 10, 15, 30, 60]
 
-    private var daemonService: SMAppService {
-        SMAppService.daemon(plistName: FanDaemonClient.plistName)
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
@@ -113,7 +109,7 @@ struct GeneralSettingsView: View {
                         .foregroundColor(.secondary)
                 }
 
-                if daemonService.status == .requiresApproval {
+                if daemon.daemonStatus == .requiresApproval {
                     Text("Aproba el daemon en Ajustes del Sistema → General → Elementos de inicio y permisos.")
                         .font(.caption)
                         .foregroundColor(.orange)
@@ -127,7 +123,7 @@ struct GeneralSettingsView: View {
     }
 
     private var statusText: String {
-        switch daemonService.status {
+        switch daemon.daemonStatus {
         case .notRegistered:
             return "No instalado"
         case .enabled:
@@ -142,7 +138,7 @@ struct GeneralSettingsView: View {
     }
 
     private var statusColor: Color {
-        switch daemonService.status {
+        switch daemon.daemonStatus {
         case .enabled:
             return .green
         case .requiresApproval:
@@ -154,7 +150,11 @@ struct GeneralSettingsView: View {
 
     private func installDaemon() {
         daemon.startDaemon()
-        actionMessage = "Solicitado. Revisa el diálogo de autenticación de administrador."
+        if let error = daemon.lastError {
+            actionMessage = error
+        } else {
+            actionMessage = "Solicitado. Revisa el diálogo de autenticación de administrador."
+        }
     }
 
     private func uninstallDaemon() {

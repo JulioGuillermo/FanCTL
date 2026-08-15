@@ -41,6 +41,7 @@ struct ContentView: View {
                 isConnected: isConnected,
                 connectionStatus: connectionStatus,
                 controlActive: fanController.canControlHardware,
+                controlError: daemonClient.lastError,
                 modeFor: mode(for:),
                 desiredRPMFor: desiredRPM(for:),
                 manualRPMFor: manualRPM(for:),
@@ -51,7 +52,8 @@ struct ContentView: View {
                     changeManualRPM(rpm, for: fan)
                 },
                 onGeneralSettings: { showingGeneralSettings = true },
-                onFanSettings: { settingsFan = $0 }
+                onFanSettings: { settingsFan = $0 },
+                onRequestControl: { requestControlPermissions() }
             )
             .frame(minWidth: 450, maxWidth: .infinity)
         }
@@ -131,6 +133,10 @@ struct ContentView: View {
         var config = settingsStore.fanSettings(for: fan)
         config.manualRPM = min(max(rpm, fan.minRPM), fan.maxRPM)
         settingsStore.updateFanSettings(config)
+    }
+
+    private func requestControlPermissions() {
+        daemonClient.requestPermissions()
     }
 
     private func applyFanControl() {
@@ -254,6 +260,7 @@ struct RightPanelFansView: View {
     let isConnected: Bool
     let connectionStatus: String
     let controlActive: Bool
+    let controlError: String?
     let modeFor: (FanInfo) -> FanMode
     let desiredRPMFor: (FanInfo) -> Double
     let manualRPMFor: (FanInfo) -> Double
@@ -261,6 +268,7 @@ struct RightPanelFansView: View {
     let onManualRPMChange: (FanInfo, Double) -> Void
     let onGeneralSettings: () -> Void
     let onFanSettings: (FanInfo) -> Void
+    let onRequestControl: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -329,6 +337,38 @@ struct RightPanelFansView: View {
 
             Divider()
 
+            // Banner de permisos: pide activar el control del ventilador
+            if !controlActive {
+                HStack(spacing: 10) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.orange)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Control del ventilador desactivado")
+                            .font(.caption)
+                            .bold()
+                        Text("El control en background necesita permisos de administrador.")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    Button("Activar permisos") { onRequestControl() }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                }
+                .padding(10)
+                .background(Color.orange.opacity(0.12))
+                .cornerRadius(8)
+                .padding(.horizontal)
+                .padding(.top, 4)
+
+                if let controlError {
+                    Text(controlError)
+                        .font(.caption2)
+                        .foregroundColor(.orange)
+                        .padding(.horizontal)
+                }
+            }
+
             // Lista de Ventiladores (ocupa todo el espacio disponible)
             if !fans.isEmpty {
                 ScrollView {
@@ -342,6 +382,7 @@ struct RightPanelFansView: View {
                                 controlActive: controlActive,
                                 onChangeMode: { onChangeMode(fan, $0) },
                                 onManualRPMChange: { onManualRPMChange(fan, $0) },
+                                onRequestControl: onRequestControl,
                                 onSettings: { onFanSettings(fan) }
                             )
                         }

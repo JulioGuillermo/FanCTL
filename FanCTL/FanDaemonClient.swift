@@ -25,9 +25,17 @@ final class FanDaemonClient: ObservableObject {
         connect()
     }
 
-    /// Lee el estado de instalación del daemon en launchd.
+    /// Lee el estado de instalación del daemon en launchd, combinando el
+    /// registro vía SMAppService y la instalación clásica en
+    /// `/Library/LaunchDaemons`.
     func refreshStatus() {
-        daemonStatus = SMAppService.daemon(plistName: Self.plistName).status
+        let smStatus = SMAppService.daemon(plistName: Self.plistName).status
+        let legacyStatus = SMAppService.statusForLegacyPlist(at: PrivilegedInstaller.legacyPlistURL)
+        if smStatus == .enabled || legacyStatus == .enabled {
+            daemonStatus = .enabled
+        } else {
+            daemonStatus = smStatus
+        }
     }
 
     // MARK: - Conexión XPC
@@ -64,7 +72,6 @@ final class FanDaemonClient: ObservableObject {
             DispatchQueue.main.async {
                 self?.isAvailable = ok
                 self?.refreshStatus()
-                if !ok { self?.lastError = "Sin respuesta del daemon." }
             }
         }
     }
@@ -93,7 +100,7 @@ final class FanDaemonClient: ObservableObject {
 
     // MARK: - Iniciar / Detener
 
-    /// Registra el daemon en launchd (pide contraseña de administrador) y
+    /// Instala el daemon como root (pide contraseña de administrador) y
     /// conecta con él.
     func startDaemon() {
         refreshStatus()
@@ -103,19 +110,36 @@ final class FanDaemonClient: ObservableObject {
             return
         }
 
-        let service = SMAppService.daemon(plistName: Self.plistName)
-        do {
-            try service.register()
+        PrivilegedInstaller.install { [weak self] ok, message in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if ok {
+                    self.lastError = nil
+                    self.stopRequested = false
+                    self.refreshStatus()
+                    // La carga del daemon es asíncrona; intentar conectar tras un momento.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                        self?.connect()
+                    }
+                } else {
+                    self.lastError = message ?? "No se pudo instalar el daemon."
+                    self.refreshStatus()
+                }
+            }
+        }
+    }
+
+    /// Solicita al sistema los permisos necesarios para controlar el ventilador.
+    /// Instala el daemon como root (con prompt de administrador) o conecta si
+    /// ya está instalado y activo.
+    func requestPermissions() {
+        refreshStatus()
+        if daemonStatus == .enabled {
             stopRequested = false
             lastError = nil
-            refreshStatus()
-            // La carga del daemon es asíncrona; intentar conectar tras un momento.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-                self?.connect()
-            }
-        } catch {
-            lastError = "No se pudo iniciar el daemon: \(error.localizedDescription)"
-            refreshStatus()
+            connect()
+        } else {
+            startDaemon()
         }
     }
 
@@ -143,16 +167,16 @@ final class FanDaemonClient: ObservableObject {
     /// corta la conexión.
     func uninstallDaemon() {
         stopRequested = true
-        do {
-            try SMAppService.daemon(plistName: Self.plistName).unregister()
-            connection?.invalidate()
-            connection = nil
-            isAvailable = false
-            lastError = nil
-        } catch {
-            lastError = "No se pudo desinstalar: \(error.localizedDescription)"
+        connection?.invalidate()
+        connection = nil
+        isAvailable = false
+        try? SMAppService.daemon(plistName: Self.plistName).unregister()
+        PrivilegedInstaller.uninstall { [weak self] ok, message in
+            DispatchQueue.main.async {
+                self?.lastError = ok ? nil : (message ?? "No se pudo desinstalar el daemon.")
+                self?.refreshStatus()
+            }
         }
-        refreshStatus()
     }
 
     private func proxy() -> FanDaemonProtocol? {

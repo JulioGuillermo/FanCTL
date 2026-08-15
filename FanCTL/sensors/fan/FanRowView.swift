@@ -9,6 +9,7 @@ struct FanRowView: View {
     var controlActive: Bool = false
     var onChangeMode: (FanMode) -> Void = { _ in }
     var onManualRPMChange: (Double) -> Void = { _ in }
+    var onRequestControl: () -> Void = {}
     var onSettings: () -> Void = {}
 
     var body: some View {
@@ -110,10 +111,9 @@ struct FanRowView: View {
                     Spacer()
 
                     if !controlActive {
-                        Text("Requiere root")
-                            .font(.caption2)
-                            .bold()
-                            .foregroundColor(.orange)
+                        Button("Activar control") { onRequestControl() }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
                     }
                 }
                 .font(.caption2)
