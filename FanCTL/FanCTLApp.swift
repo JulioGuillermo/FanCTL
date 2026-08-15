@@ -31,5 +31,6 @@ struct FanCTLApp: App {
                 .environmentObject(fanController)
                 .environmentObject(hardwareMonitor)
         }
+        .defaultSize(width: 1100, height: 760)
     }
 }

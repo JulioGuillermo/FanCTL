@@ -116,7 +116,8 @@ struct FanSettingsView: View {
                             )
                         }
                         .listStyle(.plain)
-                        .frame(maxHeight: 240)
+                        .frame(minHeight: 240, maxHeight: 320)
+                        .clipped()
                     } else {
                         Text("Sin sensores detectados.")
                             .font(.caption)
