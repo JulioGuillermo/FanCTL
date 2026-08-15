@@ -9,4 +9,5 @@ import Foundation
     func setFanSpeed(fanIndex: Int, rpm: Double, reply: @escaping (Bool) -> Void)
     func restoreSystemControl(fanIndex: Int, reply: @escaping (Bool) -> Void)
     func ping(reply: @escaping (Bool) -> Void)
+    func shutdown(reply: @escaping (Bool) -> Void)
 }

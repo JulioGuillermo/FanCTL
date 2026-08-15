@@ -41,6 +41,14 @@ final class DaemonService: NSObject, NSXPCListenerDelegate, FanDaemonProtocol {
         reply(true)
     }
 
+    func shutdown(reply: @escaping (Bool) -> Void) {
+        DaemonLog.log("[DaemonService] Apagando por petición de la app.")
+        reply(true)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            exit(0)
+        }
+    }
+
     func setFanSpeed(fanIndex: Int, rpm: Double, reply: @escaping (Bool) -> Void) {
         var ok = false
         if smc.open() {

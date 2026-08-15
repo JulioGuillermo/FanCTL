@@ -22,7 +22,7 @@ struct GeneralSettingsView: View {
                 Image(systemName: "gearshape.2.fill")
                     .font(.title)
                     .foregroundColor(.blue)
-                Text("Ajustes Generales")
+                Text("Ajustes de FanCTL")
                     .font(.title2)
                     .bold()
                 Spacer()
@@ -54,7 +54,7 @@ struct GeneralSettingsView: View {
             Divider()
 
             VStack(alignment: .leading, spacing: 8) {
-                Text("Control del ventilador (daemon)")
+                Text("Daemon de FanCTL")
                     .font(.headline)
 
                 Text("Un daemon con privilegios de administrador escribe la velocidad en el SMC. La primera instalación pedirá tu contraseña de administrador.")
@@ -95,6 +95,10 @@ struct GeneralSettingsView: View {
                 HStack(spacing: 10) {
                     Button("Instalar / Actualizar") { installDaemon() }
                         .buttonStyle(.borderedProminent)
+
+                    Button("Detener") { daemon.stopDaemon() }
+                        .buttonStyle(.bordered)
+                        .disabled(!daemon.isAvailable)
 
                     Button("Desinstalar") { uninstallDaemon() }
                         .buttonStyle(.bordered)
@@ -149,23 +153,12 @@ struct GeneralSettingsView: View {
     }
 
     private func installDaemon() {
-        do {
-            try daemonService.register()
-            actionMessage = "Solicitado. Revisa el diálogo de autenticación de administrador."
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                daemon.ping()
-            }
-        } catch {
-            actionMessage = "Error al instalar: \(error.localizedDescription)"
-        }
+        daemon.startDaemon()
+        actionMessage = "Solicitado. Revisa el diálogo de autenticación de administrador."
     }
 
     private func uninstallDaemon() {
-        do {
-            try daemonService.unregister()
-            actionMessage = "Daemon desinstalado. El control pasa a depender de los permisos de la app."
-        } catch {
-            actionMessage = "Error al desinstalar: \(error.localizedDescription)"
-        }
+        daemon.uninstallDaemon()
+        actionMessage = "Daemon desinstalado. El control pasa a depender de los permisos de la app."
     }
 }

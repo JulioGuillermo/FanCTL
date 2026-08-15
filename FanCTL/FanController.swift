@@ -15,6 +15,8 @@ final class FanController: ObservableObject {
     private let client: SMCClient
     private let daemon: FanDaemonClient?
     @Published private(set) var canControlHardware = false
+    /// Velocidad aplicada a cada ventilador (para mostrar el estado en la UI).
+    @Published private(set) var appliedSpeeds: [Int: Double] = [:]
     private var privilegeChecked = false
     private var lastApplied: [Int: Double] = [:]
 
@@ -64,6 +66,7 @@ final class FanController: ObservableObject {
             daemon.setFanSpeed(fanIndex: index, rpm: rpm) { [weak self] ok in
                 if ok {
                     self?.lastApplied[index] = rpm
+                    self?.appliedSpeeds[index] = rpm
                     AppLog.log("[FanController] F\(index) manual, velocidad = \(Int(rpm)) RPM (daemon)")
                 }
             }
@@ -78,6 +81,7 @@ final class FanController: ObservableObject {
 
         if client.writeKeyData(key + "Md", bytes: [1]) {
             lastApplied[index] = rpm
+            appliedSpeeds[index] = rpm
             AppLog.log("[FanController] F\(index) manual, velocidad = \(Int(rpm)) RPM")
         }
         client.writeKeyData(key + "Mn", bytes: fltBytes)
@@ -89,6 +93,7 @@ final class FanController: ObservableObject {
             daemon.restoreSystemControl(fanIndex: index) { [weak self] ok in
                 if ok {
                     self?.lastApplied.removeValue(forKey: index)
+                    self?.appliedSpeeds.removeValue(forKey: index)
                     AppLog.log("[FanController] F\(index) restaurado al control del sistema (daemon)")
                 }
             }
@@ -100,6 +105,7 @@ final class FanController: ObservableObject {
         let key = "F\(index)"
         if client.writeKeyData(key + "Md", bytes: [0]) {
             lastApplied.removeValue(forKey: index)
+            appliedSpeeds.removeValue(forKey: index)
             AppLog.log("[FanController] F\(index) restaurado al control del sistema")
         }
     }

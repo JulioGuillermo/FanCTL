@@ -4,6 +4,9 @@ internal import Combine
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
 
+    @EnvironmentObject private var daemonClient: FanDaemonClient
+    @EnvironmentObject private var fanController: FanController
+
     @State private var sensors: [SensorInfo] = []
     @State private var fans: [FanInfo] = []
     @State private var connectionStatus: String = "No iniciado"
@@ -15,17 +18,9 @@ struct ContentView: View {
     @State private var lastRefresh: Date = .distantPast
 
     @StateObject private var settingsStore = SettingsStore()
-    @StateObject private var daemonClient: FanDaemonClient
-    @StateObject private var fanController: FanController
 
     // Ticker de 0.5s para respetar el intervalo configurado de reescaneo
     private let ticker = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
-
-    init() {
-        let daemon = FanDaemonClient()
-        _daemonClient = StateObject(wrappedValue: daemon)
-        _fanController = StateObject(wrappedValue: FanController(daemon: daemon))
-    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -467,5 +462,8 @@ struct MetaRow: View {
 }
 
 #Preview {
-    ContentView()
+    let daemon = FanDaemonClient()
+    return ContentView()
+        .environmentObject(daemon)
+        .environmentObject(FanController(daemon: daemon))
 }

@@ -1,25 +1,36 @@
 import Foundation
+import ServiceManagement
 internal import Combine
 
-/// Cliente XPC del daemon privilegiado de FanCTL.
+/// Cliente del daemon privilegiado de FanCTL.
 ///
 /// Conecta con el mach service `com.jg.FanCTL.daemon` y expone el control
 /// remoto del ventilador cuando el daemon está instalado y registrado.
-/// Expone `isAvailable` para que la UI sepa si se está controlando a través
-/// del daemon o directamente.
+/// También permite iniciarlo (`SMAppService.register`) y detenerlo (el daemon
+/// sale por petición vía XPC).
 final class FanDaemonClient: ObservableObject {
     static let machServiceName = "com.jg.FanCTL.daemon"
     /// Nombre del plist dentro de `Contents/Library/LaunchDaemons` del bundle.
     static let plistName = "com.jg.FanCTL.daemon.plist"
 
     @Published private(set) var isAvailable = false
+    @Published private(set) var daemonStatus: SMAppService.Status = .notRegistered
     @Published private(set) var lastError: String?
 
     private var connection: NSXPCConnection?
+    private var stopRequested = false
 
     init() {
+        refreshStatus()
         connect()
     }
+
+    /// Lee el estado de instalación del daemon en launchd.
+    func refreshStatus() {
+        daemonStatus = SMAppService.daemon(plistName: Self.plistName).status
+    }
+
+    // MARK: - Conexión XPC
 
     private func connect() {
         connection?.invalidate()
@@ -27,13 +38,14 @@ final class FanDaemonClient: ObservableObject {
         let connection = NSXPCConnection(machServiceName: Self.machServiceName, options: .privileged)
         connection.remoteObjectInterface = NSXPCInterface(with: FanDaemonProtocol.self)
         connection.interruptionHandler = { [weak self] in
-            // El daemon se cayó: marcar no disponible y reintentar conectarse.
+            // El daemon se cayó. Si no se pidió detenerlo, reintentar conectarse.
             DispatchQueue.main.async {
-                self?.connection?.invalidate()
-                self?.connection = nil
-                self?.isAvailable = false
+                guard let self, !self.stopRequested else { return }
+                self.connection?.invalidate()
+                self.connection = nil
+                self.isAvailable = false
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                    self?.connect()
+                    self.connect()
                 }
             }
         }
@@ -47,17 +59,20 @@ final class FanDaemonClient: ObservableObject {
     }
 
     func ping() {
-        guard let proxy = proxy() else { return }
+        guard !stopRequested, let proxy = proxy() else { return }
         proxy.ping { [weak self] ok in
             DispatchQueue.main.async {
                 self?.isAvailable = ok
+                self?.refreshStatus()
                 if !ok { self?.lastError = "Sin respuesta del daemon." }
             }
         }
     }
 
+    // MARK: - Control del ventilador (XPC)
+
     func setFanSpeed(fanIndex: Int, rpm: Double, completion: @escaping (Bool) -> Void) {
-        guard let proxy = proxy() else {
+        guard !stopRequested, let proxy = proxy() else {
             completion(false)
             return
         }
@@ -67,13 +82,77 @@ final class FanDaemonClient: ObservableObject {
     }
 
     func restoreSystemControl(fanIndex: Int, completion: @escaping (Bool) -> Void) {
-        guard let proxy = proxy() else {
+        guard !stopRequested, let proxy = proxy() else {
             completion(false)
             return
         }
         proxy.restoreSystemControl(fanIndex: fanIndex) { ok in
             DispatchQueue.main.async { completion(ok) }
         }
+    }
+
+    // MARK: - Iniciar / Detener
+
+    /// Registra el daemon en launchd (pide contraseña de administrador) y
+    /// conecta con él.
+    func startDaemon() {
+        refreshStatus()
+        guard daemonStatus != .enabled else {
+            stopRequested = false
+            connect()
+            return
+        }
+
+        let service = SMAppService.daemon(plistName: Self.plistName)
+        do {
+            try service.register()
+            stopRequested = false
+            lastError = nil
+            refreshStatus()
+            // La carga del daemon es asíncrona; intentar conectar tras un momento.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                self?.connect()
+            }
+        } catch {
+            lastError = "No se pudo iniciar el daemon: \(error.localizedDescription)"
+            refreshStatus()
+        }
+    }
+
+    /// Pide al daemon que termine y corta la conexión. No desinstala el daemon
+    /// (sigue registrado para volver a arrancarlo bajo demanda).
+    func stopDaemon() {
+        stopRequested = true
+        guard let proxy = proxy() else {
+            connection?.invalidate()
+            connection = nil
+            isAvailable = false
+            return
+        }
+        proxy.shutdown { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.connection?.invalidate()
+                self?.connection = nil
+                self?.isAvailable = false
+                self?.refreshStatus()
+            }
+        }
+    }
+
+    /// Desinstala el daemon de launchd (pide contraseña de administrador) y
+    /// corta la conexión.
+    func uninstallDaemon() {
+        stopRequested = true
+        do {
+            try SMAppService.daemon(plistName: Self.plistName).unregister()
+            connection?.invalidate()
+            connection = nil
+            isAvailable = false
+            lastError = nil
+        } catch {
+            lastError = "No se pudo desinstalar: \(error.localizedDescription)"
+        }
+        refreshStatus()
     }
 
     private func proxy() -> FanDaemonProtocol? {
