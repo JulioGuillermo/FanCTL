@@ -40,7 +40,7 @@ struct ContentView: View {
                 systemInfo: SystemInfo.shared,
                 isConnected: isConnected,
                 connectionStatus: connectionStatus,
-                controlActive: fanController.canControlHardware,
+                controlActive: daemonClient.isAvailable || fanController.canControlHardware,
                 controlError: daemonClient.lastError,
                 isRequestingPermissions: daemonClient.isRequestingPermissions,
                 modeFor: mode(for:),
@@ -137,7 +137,7 @@ struct ContentView: View {
     }
 
     private func requestControlPermissions() {
-        daemonClient.toggle()
+        daemonClient.startDaemon()
     }
 
     private func applyFanControl() {

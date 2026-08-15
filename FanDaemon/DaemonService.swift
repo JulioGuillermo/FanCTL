@@ -16,6 +16,10 @@ final class DaemonService: NSObject, NSXPCListenerDelegate, FanDaemonProtocol {
     func start() {
         listener.resume()
         DaemonLog.log("[DaemonService] Daemon iniciado (pid \(getpid()))")
+        if smc.open() {
+            smc.dumpFanKeys()
+            smc.close()
+        }
     }
 
     // MARK: - NSXPCListenerDelegate
@@ -52,7 +56,7 @@ final class DaemonService: NSObject, NSXPCListenerDelegate, FanDaemonProtocol {
     func setFanSpeed(fanIndex: Int, rpm: Double, reply: @escaping (Bool) -> Void) {
         var ok = false
         if smc.open() {
-            ok = smc.setManualMode(fanIndex: fanIndex, rpm: rpm)
+            ok = smc.setFanSpeed(fanIndex: fanIndex, rpm: rpm)
             smc.close()
         }
         if ok {
@@ -66,7 +70,7 @@ final class DaemonService: NSObject, NSXPCListenerDelegate, FanDaemonProtocol {
     func restoreSystemControl(fanIndex: Int, reply: @escaping (Bool) -> Void) {
         var ok = false
         if smc.open() {
-            ok = smc.writeKey("F\(fanIndex)Md", bytes: [0])
+            ok = smc.restoreSystemControl(fanIndex: fanIndex)
             smc.close()
         }
         if ok {

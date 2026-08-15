@@ -71,16 +71,66 @@ final class DaemonSMCClient {
         }
     }
 
-    /// Fija un ventilador en modo manual a la velocidad indicada.
-    /// - Returns: `true` si ambas escrituras (modo y velocidad) se completaron.
-    func setManualMode(fanIndex: Int, rpm: Double) -> Bool {
+    /// Fija un ventilador a la velocidad indicada (Apple Silicon: clave `F{N}Tg`).
+    /// - Returns: `true` si la escritura de velocidad se completó.
+    func setFanSpeed(fanIndex: Int, rpm: Double) -> Bool {
         let key = "F\(fanIndex)"
-        guard writeKey(key + "Md", bytes: [1]) else {
-            DaemonLog.log("[DaemonSMCClient] No se pudo poner F\(fanIndex) en modo manual.")
-            return false
+        // Modo manual: ayuda a fijar el valor, pero puede ser rechazado (error 130)
+        // en Apple Silicon; no es bloqueante.
+        if writeKey(key + "Md", bytes: [1]) {
+            DaemonLog.log("[DaemonSMCClient] F\(fanIndex) modo manual OK")
+        } else {
+            DaemonLog.log("[DaemonSMCClient] F\(fanIndex) modo manual rechazado (no bloqueante)")
         }
         let fltBytes = withUnsafeBytes(of: Float(rpm)) { Array($0) }
-        return writeKey(key + "Mn", bytes: fltBytes)
+        if writeKey(key + "Tg", bytes: fltBytes) {
+            return true
+        }
+        DaemonLog.log("[DaemonSMCClient] No se pudo escribir la velocidad en \(key)Tg.")
+        return false
+    }
+
+    /// Devuelve un ventilador al control del sistema (modo automático).
+    /// En Apple Silicon el modo automático se observa como `F{N}Md = 3`.
+    func restoreSystemControl(fanIndex: Int) -> Bool {
+        let key = "F\(fanIndex)"
+        if writeKey(key + "Md", bytes: [0]) {
+            return true
+        }
+        DaemonLog.log("[DaemonSMCClient] F\(fanIndex) auto=0 rechazado, probando auto=3")
+        return writeKey(key + "Md", bytes: [3])
+    }
+
+    /// Diagnóstico: vuelca las claves conocidas del ventilador 0.
+    func dumpFanKeys() {
+        for suffix in ["Md", "Mn", "Ac", "Tg"] {
+            let key = "F0" + suffix
+            if let info = keyInfo(key) {
+                DaemonLog.log("[DaemonSMCClient] \(key): dataSize=\(info.dataSize) type=\(typeString(info.dataType))")
+            } else {
+                DaemonLog.log("[DaemonSMCClient] \(key): GET_KEY_INFO falló o dataSize=0")
+            }
+        }
+    }
+
+    private func typeString(_ type: FourCharCode) -> String {
+        var code = type.bigEndian
+        let s = withUnsafeBytes(of: &code) { raw in
+            String(decoding: raw, as: UTF8.self)
+        }
+        return s
+    }
+
+    private func keyInfo(_ key: String) -> (dataSize: Int, dataType: FourCharCode)? {
+        let keyCode = UInt32(smcKey: key)
+        var inputInfo = SMCParamStruct()
+        var outputInfo = SMCParamStruct()
+        inputInfo.key = keyCode
+        inputInfo.data8 = UInt8(kSMCCmdGetKeyInfo)
+        guard callStruct(input: &inputInfo, output: &outputInfo) else { return nil }
+        let dataSize = Int(outputInfo.keyInfo.dataSize)
+        guard dataSize > 0 else { return nil }
+        return (dataSize, outputInfo.keyInfo.dataType)
     }
 
     /// Escribe datos crudos en una clave del SMC (ej. "F0Md", "F0Mn").
@@ -97,7 +147,10 @@ final class DaemonSMCClient {
         guard callStruct(input: &inputInfo, output: &outputInfo) else { return false }
 
         let dataSize = Int(outputInfo.keyInfo.dataSize)
-        guard dataSize > 0 else { return false }
+        guard dataSize > 0 else {
+            DaemonLog.log("[DaemonSMCClient] \(key): GET_KEY_INFO ok pero dataSize=0")
+            return false
+        }
 
         var inputWrite = SMCParamStruct()
         var outputWrite = SMCParamStruct()
@@ -111,7 +164,11 @@ final class DaemonSMCClient {
             raw.baseAddress?.copyMemory(from: bytes, byteCount: count)
         }
 
-        return callStruct(input: &inputWrite, output: &outputWrite)
+        if callStruct(input: &inputWrite, output: &outputWrite) {
+            return true
+        }
+        DaemonLog.log("[DaemonSMCClient] \(key): escritura rechazada (result=\(outputWrite.result), dataSize=\(dataSize))")
+        return false
     }
 
     private func callStruct(input: inout SMCParamStruct, output: inout SMCParamStruct) -> Bool {

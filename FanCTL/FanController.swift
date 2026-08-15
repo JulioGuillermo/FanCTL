@@ -58,20 +58,31 @@ final class FanController: ObservableObject {
 
     /// Fija la velocidad de un ventilador dejándolo en modo manual.
     /// Omite la escritura si la velocidad no ha cambiado desde la última vez.
+    ///
+    /// Si el daemon está disponible se delega en él de inmediato (no depende
+    /// del caché de privilegios, que puede ser obsoleto al arrancar la app).
     func setSpeed(_ rpm: Double, toFan index: Int) {
-        guard canControlHardware || checkPrivileges() else { return }
-        if lastApplied[index] == rpm { return }
-
         if let daemon, daemon.isAvailable {
+            if lastApplied[index] == rpm { return }
             daemon.setFanSpeed(fanIndex: index, rpm: rpm) { [weak self] ok in
-                if ok {
-                    self?.lastApplied[index] = rpm
-                    self?.appliedSpeeds[index] = rpm
-                    AppLog.log("[FanController] F\(index) manual, velocidad = \(Int(rpm)) RPM (daemon)")
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    if ok {
+                        self.lastApplied[index] = rpm
+                        self.appliedSpeeds[index] = rpm
+                        self.canControlHardware = true
+                        AppLog.log("[FanController] F\(index) manual, velocidad = \(Int(rpm)) RPM (daemon)")
+                    } else {
+                        self.canControlHardware = false
+                        AppLog.log("[FanController] F\(index): el daemon no pudo escribir la velocidad.")
+                    }
                 }
             }
             return
         }
+
+        guard canControlHardware || checkPrivileges() else { return }
+        if lastApplied[index] == rpm { return }
 
         guard client.open() else { return }
         defer { client.close() }
@@ -84,7 +95,7 @@ final class FanController: ObservableObject {
             appliedSpeeds[index] = rpm
             AppLog.log("[FanController] F\(index) manual, velocidad = \(Int(rpm)) RPM")
         }
-        client.writeKeyData(key + "Mn", bytes: fltBytes)
+        client.writeKeyData(key + "Tg", bytes: fltBytes)
     }
 
     /// Devuelve el control del ventilador al sistema (modo automático).

@@ -24,10 +24,24 @@ final class FanDaemonClient: ObservableObject {
 
     private var connection: NSXPCConnection?
     private var stopRequested = false
+    private var heartbeatTimer: Timer?
 
     init() {
         refreshStatus()
         connect()
+        startHeartbeat()
+    }
+
+    /// Sondea el daemon periódicamente para recuperar la conexión aunque se
+    /// pierda algún ping inicial.
+    private func startHeartbeat() {
+        heartbeatTimer?.invalidate()
+        let timer = Timer(timeInterval: 5, repeats: true) { [weak self] _ in
+            guard let self, !self.stopRequested else { return }
+            self.ping()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        heartbeatTimer = timer
     }
 
     /// Lee el estado de instalación del daemon en launchd, combinando el
@@ -158,7 +172,12 @@ final class FanDaemonClient: ObservableObject {
 
         self.connection = connection
         connection.resume()
-        ping()
+
+        // Esperar a que la conexión XPC se establezca antes del primer ping;
+        // llamar a métodos inmediatamente tras resume() puede fallar.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+            self?.ping()
+        }
     }
 
     func ping() {
@@ -175,10 +194,13 @@ final class FanDaemonClient: ObservableObject {
 
     func setFanSpeed(fanIndex: Int, rpm: Double, completion: @escaping (Bool) -> Void) {
         guard let proxy = proxy() else {
+            AppLog.log("[DaemonClient] setFanSpeed F\(fanIndex) cancelado: sin proxy XPC")
             completion(false)
             return
         }
+        AppLog.log("[DaemonClient] Enviando setFanSpeed F\(fanIndex)=\(Int(rpm)) por XPC")
         proxy.setFanSpeed(fanIndex: fanIndex, rpm: rpm) { ok in
+            AppLog.log("[DaemonClient] Respuesta setFanSpeed F\(fanIndex)=\(Int(rpm)) -> \(ok)")
             DispatchQueue.main.async { completion(ok) }
         }
     }
@@ -196,6 +218,7 @@ final class FanDaemonClient: ObservableObject {
     private func proxy() -> FanDaemonProtocol? {
         connection?.remoteObjectProxyWithErrorHandler { [weak self] error in
             DispatchQueue.main.async {
+                AppLog.log("[DaemonClient] Error del proxy XPC: \(error.localizedDescription)")
                 self?.isAvailable = false
                 self?.lastError = error.localizedDescription
             }
