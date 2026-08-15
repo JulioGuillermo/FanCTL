@@ -50,12 +50,11 @@ class SMCScanner {
     }
 
     private func fourCharCodeToString(_ code: UInt32) -> String {
-        let bigEndianCode = code.bigEndian
         let bytes = [
-            UInt8((bigEndianCode >> 24) & 0xFF),
-            UInt8((bigEndianCode >> 16) & 0xFF),
-            UInt8((bigEndianCode >> 8) & 0xFF),
-            UInt8(bigEndianCode & 0xFF)
+            UInt8((code >> 24) & 0xFF),
+            UInt8((code >> 16) & 0xFF),
+            UInt8((code >> 8) & 0xFF),
+            UInt8(code & 0xFF)
         ]
         return String(bytes: bytes, encoding: .ascii) ?? "????"
     }
@@ -132,27 +131,31 @@ class SMCScanner {
             return nil
         }
         
-        let mirror = Mirror(reflecting: outputRead.bytes)
-        let byteArray = mirror.children.prefix(Int(dataSize)).compactMap { $0.value as? UInt8 }
+        let byteArray = withUnsafeBytes(of: outputRead.bytes) {
+            Array($0.prefix(Int(dataSize)))
+        }
         
         return (byteArray, dataType, dataSize)
     }
 
-    // Parsea los datos numéricos de velocidad del ventilador (fpe2, flt, ui16, ui32)
+    // Parsea los datos numéricos de velocidad del ventilador (flt, fpe2, ui16, ui32)
     private func parseFanRPM(_ data: (bytes: [UInt8], type: String, size: UInt32)) -> Double? {
-        if data.type == "fpe2" && data.bytes.count >= 2 {
+        let cleanType = data.type.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if cleanType == "flt" && data.bytes.count >= 4 {
+            let f = data.bytes.withUnsafeBytes { $0.loadUnaligned(as: Float.self) }
+            return Double(f)
+        }
+        if cleanType == "fpe2" && data.bytes.count >= 2 {
             let rawVal = (UInt16(data.bytes[0]) << 8) | UInt16(data.bytes[1])
             return Double(rawVal) / 4.0
         }
-        if data.type == "flt " && data.bytes.count >= 4 {
-            let u32Val = (UInt32(data.bytes[0]) << 24) |
-                         (UInt32(data.bytes[1]) << 16) |
-                         (UInt32(data.bytes[2]) << 8)  |
-                         UInt32(data.bytes[3])
-            return Double(Float(bitPattern: u32Val))
-        }
-        if data.type == "ui16" && data.bytes.count >= 2 {
+        if cleanType == "ui16" && data.bytes.count >= 2 {
             return Double((UInt16(data.bytes[0]) << 8) | UInt16(data.bytes[1]))
+        }
+        if cleanType.isEmpty && data.bytes.count == 4 {
+            let f = data.bytes.withUnsafeBytes { $0.loadUnaligned(as: Float.self) }
+            if f.isFinite && f >= 0 && f < 100000 { return Double(f) }
         }
         return nil
     }
@@ -164,8 +167,9 @@ class SMCScanner {
 
     private func readTemperatureKey(_ key: String) -> Double? {
         guard let data = readSMCKeyData(key: key) else { return nil }
+        let cleanType = data.type.trimmingCharacters(in: .whitespacesAndNewlines)
         
-        if data.type == "sp78" && data.bytes.count >= 2 {
+        if cleanType == "sp78" && data.bytes.count >= 2 {
             let rawVal = (Int16(data.bytes[0]) << 8) | Int16(data.bytes[1])
             let temp = Double(rawVal) / 256.0
             if temp > 0 && temp < 130 {
@@ -173,12 +177,17 @@ class SMCScanner {
             }
         }
         
-        if data.type == "flt " && data.bytes.count >= 4 {
-            let u32Val = (UInt32(data.bytes[0]) << 24) |
-                         (UInt32(data.bytes[1]) << 16) |
-                         (UInt32(data.bytes[2]) << 8)  |
-                         UInt32(data.bytes[3])
-            let temp = Float(bitPattern: u32Val)
+        if cleanType == "flt" && data.bytes.count >= 4 {
+            let temp = data.bytes.withUnsafeBytes { $0.loadUnaligned(as: Float.self) }
+            let tempDouble = Double(temp)
+            if tempDouble > 0 && tempDouble < 130 {
+                return tempDouble
+            }
+        }
+        
+        // Algunos modelos Apple Silicon no reportan dataType: intentar Float32 (host-endian)
+        if cleanType.isEmpty && data.bytes.count >= 4 {
+            let temp = data.bytes.withUnsafeBytes { $0.loadUnaligned(as: Float.self) }
             let tempDouble = Double(temp)
             if tempDouble > 0 && tempDouble < 130 {
                 return tempDouble

@@ -14,21 +14,22 @@ class FanScanner {
     }
 
     private func fourCharCodeToString(_ code: UInt32) -> String {
-        let bigEndianCode = code.bigEndian
         let bytes = [
-            UInt8((bigEndianCode >> 24) & 0xFF),
-            UInt8((bigEndianCode >> 16) & 0xFF),
-            UInt8((bigEndianCode >> 8) & 0xFF),
-            UInt8(bigEndianCode & 0xFF)
+            UInt8((code >> 24) & 0xFF),
+            UInt8((code >> 16) & 0xFF),
+            UInt8((code >> 8) & 0xFF),
+            UInt8(code & 0xFF)
         ]
         return String(bytes: bytes, encoding: .ascii) ?? "????"
     }
 
     func openConnection() -> Bool {
+        AppLog.log("[FanScanner] Abriendo conexión con AppleSMC...")
         let mainPort: mach_port_t = 0
         let service = IOServiceGetMatchingService(mainPort, IOServiceMatching("AppleSMC"))
         guard service != 0 else {
             print("[-][FanScanner] Error: No se encontró el servicio AppleSMC.")
+            AppLog.log("[-][FanScanner] Error: No se encontró el servicio AppleSMC.")
             return false
         }
         defer { IOObjectRelease(service) }
@@ -36,8 +37,10 @@ class FanScanner {
         let result = IOServiceOpen(service, mach_task_self_, 0, &connection)
         if result != kIOReturnSuccess {
             print("[-][FanScanner] IOServiceOpen falló con código: \(String(format: "0x%08x", result))")
+            AppLog.log("[-][FanScanner] IOServiceOpen falló con código: \(String(format: "0x%08x", result))")
             return false
         }
+        AppLog.log("[FanScanner] Conexión AppleSMC OK (connection=\(connection))")
         return true
     }
 
@@ -60,7 +63,11 @@ class FanScanner {
             &output,
             &outputSize
         )
-        return result == kIOReturnSuccess && output.result == UInt8(kSMCSuccess)
+        if result != kIOReturnSuccess || output.result != UInt8(kSMCSuccess) {
+            AppLog.log("[FanScanner] callSMC falló: kr=\(String(format: "0x%08x", result)) res=\(output.result)")
+            return false
+        }
+        return true
     }
 
     private func readSMCKeyData(key: String) -> (bytes: [UInt8], type: String, size: UInt32)? {
@@ -73,6 +80,7 @@ class FanScanner {
         inputInfo.data8 = UInt8(kSMCCmdGetKeyInfo)
         
         guard callSMC(input: &inputInfo, output: &outputInfo), outputInfo.result == UInt8(kSMCSuccess) else {
+            AppLog.log("[FanScanner] GET_KEY_INFO \(key) falló: res=\(outputInfo.result)")
             return nil
         }
         
@@ -92,27 +100,25 @@ class FanScanner {
             return nil
         }
         
-        let mirror = Mirror(reflecting: outputRead.bytes)
-        let byteArray = mirror.children.prefix(Int(dataSize)).compactMap { $0.value as? UInt8 }
-        
+        let byteArray = withUnsafeBytes(of: outputRead.bytes) {
+            Array($0.prefix(Int(dataSize)))
+        }
         return (byteArray, dataType, dataSize)
     }
 
     private func parseFanRPM(_ data: (bytes: [UInt8], type: String, size: UInt32)) -> Double? {
         let cleanType = data.type.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // Formato fpe2: Fixed Point 14.2 (valor crudo dividido entre 4)
+        // Formato flt: Float32 IEEE-754 de 4 bytes. En Apple Silicon se guarda en
+        // endianness nativo del host (little-endian en este hardware).
+        if cleanType == "flt" && data.bytes.count >= 4 {
+            let f = data.bytes.withUnsafeBytes { $0.loadUnaligned(as: Float.self) }
+            return Double(f)
+        }
+        // Formato fpe2: Fixed Point 14.2 (Intel, big-endian: valor crudo dividido entre 4)
         if cleanType == "fpe2" && data.bytes.count >= 2 {
             let rawVal = (UInt16(data.bytes[0]) << 8) | UInt16(data.bytes[1])
             return Double(rawVal) / 4.0
-        }
-        // Formato flt: Float32 IEEE-754 de 4 bytes
-        if cleanType == "flt" && data.bytes.count >= 4 {
-            let u32Val = (UInt32(data.bytes[0]) << 24) |
-                         (UInt32(data.bytes[1]) << 16) |
-                         (UInt32(data.bytes[2]) << 8)  |
-                         UInt32(data.bytes[3])
-            return Double(Float(bitPattern: u32Val))
         }
         // Formato ui16: Entero sin signo de 16 bits
         if cleanType == "ui16" && data.bytes.count >= 2 {
@@ -121,6 +127,11 @@ class FanScanner {
         // Formato ui8: Entero sin signo de 8 bits
         if cleanType == "ui8" && data.bytes.count >= 1 {
             return Double(data.bytes[0])
+        }
+        // Algunos modelos Apple Silicon no reportan dataType: intentar Float32 (host-endian)
+        if cleanType.isEmpty && data.bytes.count == 4 {
+            let f = data.bytes.withUnsafeBytes { $0.loadUnaligned(as: Float.self) }
+            if f.isFinite && f >= 0 && f < 100000 { return Double(f) }
         }
         // Fallback de 2 bytes si el tipo no coincide exactamente
         if data.bytes.count == 2 {
@@ -160,6 +171,7 @@ class FanScanner {
         }
 
         print("[FanScanner] Ventiladores físicos detectados: \(fanCount)")
+        AppLog.log("[FanScanner] Ventiladores físicos detectados: \(fanCount)")
 
         // 2. Si existen ventiladores, iterar leyendo las claves de cada uno
         for i in 0..<fanCount {

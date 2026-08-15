@@ -5,13 +5,17 @@
 
 import IOKit
 
-// Constantes para comunicación con AppleSMC
-public let KKERNEL_INDEX_SMC: UInt32 = 0
+// Constantes para comunicación con AppleSMC.
+// IMPORTANTE: deben coincidir con los valores del header C (TemperatureBridge.h).
+// Los valores antiguos (0, 251, 254, 253) hacían que el driver respondiera
+// kIOReturnSuccess sin escribir nada (salida a ceros) y ningún ventilador/sensor SMC se leyera.
+
+public let KKERNEL_INDEX_SMC: UInt32 = 2
 
 // Comandos SMC
-public let kSMCCmdReadBytes: UInt8 = 254
-public let kSMCCmdGetKeyInfo: UInt8 = 251
-public let kSMCCmdReadIndex: UInt8 = 253
+public let kSMCCmdReadBytes: UInt8 = 5
+public let kSMCCmdGetKeyInfo: UInt8 = 9
+public let kSMCCmdReadIndex: UInt8 = 8
 
 // Resultados
 public let kSMCSuccess: UInt8 = 0

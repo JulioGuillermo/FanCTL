@@ -53,18 +53,21 @@ struct ContentView: View {
 
     private func refreshSensors() {
         isScanning = true
-        
+        AppLog.log("[Content] refreshSensors() iniciado")
+
         // 1. Escanear sensores térmicos y metadatos IOKit / SMC
         let smcScanner = SMCScanner()
         let result = smcScanner.getDetailedSensors()
         self.sensors = result.sensors
         self.isConnected = result.connectionOk
         self.connectionStatus = result.connectionOk ? "Conectado (Sin Sandbox)" : "Error de Conexión"
+        AppLog.log("[Content] Sensores totales: \(self.sensors.count), connectionOk: \(result.connectionOk)")
 
         // 2. Escanear estado de ventiladores usando FanScanner dedicado
         let fanScanner = FanScanner()
         self.fans = fanScanner.getAllFans()
-        
+        AppLog.log("[Content] Ventiladores listados en UI: \(self.fans.count)")
+
         isScanning = false
     }
 }

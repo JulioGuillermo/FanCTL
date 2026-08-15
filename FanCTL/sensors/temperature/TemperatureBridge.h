@@ -6,7 +6,9 @@
 
 #define KKERNEL_INDEX_SMC 2
 
-#pragma pack(push, 1)
+// IMPORTANTE: AppleSMC espera el struct SMCKeyData con alineación natural (80 bytes).
+// Un struct empaquetado (pack(1), 74 bytes) hace fallar todas las llamadas con
+// kIOReturnMessageTooLarge (0xe00002c2) en Apple Silicon.
 
 typedef struct {
     uint8_t  major;
@@ -41,8 +43,6 @@ typedef struct {
     uint32_t             data32;
     uint8_t              bytes[32];
 } SMCParamStruct;
-
-#pragma pack(pop)
 
 enum {
     kSMCSuccess     = 0,
