@@ -1,11 +1,20 @@
 import SwiftUI
+import ServiceManagement
 
-/// Hoja de ajustes generales de la app (por ahora solo el intervalo de reescaneo).
+/// Hoja de ajustes generales de la app: intervalo de reescaneo y control del
+/// ventilador mediante el daemon privilegiado.
 struct GeneralSettingsView: View {
     @ObservedObject var store: SettingsStore
+    @ObservedObject var daemon: FanDaemonClient
     @Environment(\.dismiss) var dismiss
 
+    @State private var actionMessage: String?
+
     private let intervalOptions: [Double] = [0.5, 1, 2, 3, 5, 10, 15, 30, 60]
+
+    private var daemonService: SMAppService {
+        SMAppService.daemon(plistName: FanDaemonClient.plistName)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -42,9 +51,121 @@ struct GeneralSettingsView: View {
                 .pickerStyle(.menu)
             }
 
+            Divider()
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Control del ventilador (daemon)")
+                    .font(.headline)
+
+                Text("Un daemon con privilegios de administrador escribe la velocidad en el SMC. La primera instalación pedirá tu contraseña de administrador.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: 8, height: 8)
+                    Text(statusText)
+                        .font(.caption)
+                        .bold()
+
+                    Spacer()
+
+                    if daemon.isAvailable {
+                        Text("Conectado")
+                            .font(.caption2)
+                            .bold()
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.green.opacity(0.15))
+                            .foregroundColor(.green)
+                            .cornerRadius(4)
+                    } else {
+                        Text("Sin conexión XPC")
+                            .font(.caption2)
+                            .bold()
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.orange.opacity(0.15))
+                            .foregroundColor(.orange)
+                            .cornerRadius(4)
+                    }
+                }
+
+                HStack(spacing: 10) {
+                    Button("Instalar / Actualizar") { installDaemon() }
+                        .buttonStyle(.borderedProminent)
+
+                    Button("Desinstalar") { uninstallDaemon() }
+                        .buttonStyle(.bordered)
+
+                    Button("Reintentar conexión") { daemon.ping() }
+                        .buttonStyle(.bordered)
+                }
+
+                if let message = actionMessage {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                if daemonService.status == .requiresApproval {
+                    Text("Aproba el daemon en Ajustes del Sistema → General → Elementos de inicio y permisos.")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                }
+            }
+
             Spacer()
         }
         .padding()
-        .frame(width: 420, height: 260)
+        .frame(width: 460)
+    }
+
+    private var statusText: String {
+        switch daemonService.status {
+        case .notRegistered:
+            return "No instalado"
+        case .enabled:
+            return "Instalado y activo"
+        case .requiresApproval:
+            return "Requiere aprobación"
+        case .notFound:
+            return "Daemon ausente del bundle"
+        @unknown default:
+            return "Estado desconocido"
+        }
+    }
+
+    private var statusColor: Color {
+        switch daemonService.status {
+        case .enabled:
+            return .green
+        case .requiresApproval:
+            return .orange
+        default:
+            return .gray
+        }
+    }
+
+    private func installDaemon() {
+        do {
+            try daemonService.register()
+            actionMessage = "Solicitado. Revisa el diálogo de autenticación de administrador."
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                daemon.ping()
+            }
+        } catch {
+            actionMessage = "Error al instalar: \(error.localizedDescription)"
+        }
+    }
+
+    private func uninstallDaemon() {
+        do {
+            try daemonService.unregister()
+            actionMessage = "Daemon desinstalado. El control pasa a depender de los permisos de la app."
+        } catch {
+            actionMessage = "Error al desinstalar: \(error.localizedDescription)"
+        }
     }
 }

@@ -131,7 +131,7 @@ struct FanSettingsView: View {
             summarySection
         }
         .padding()
-        .frame(width: 500, height: 640)
+        .frame(width: 500)
         .onAppear {
             // Por defecto, si no hay selección guardada, seleccionar todos los sensores
             if config.selectedSensorKeys.isEmpty && !sensors.isEmpty {
