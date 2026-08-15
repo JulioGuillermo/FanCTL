@@ -57,6 +57,8 @@ final class DaemonService: NSObject, NSXPCListenerDelegate, FanDaemonProtocol {
         }
         if ok {
             DaemonLog.log("[DaemonService] F\(fanIndex) manual, velocidad = \(Int(rpm)) RPM")
+        } else {
+            DaemonLog.log("[DaemonService] ERROR: no se pudo fijar F\(fanIndex) a \(Int(rpm)) RPM")
         }
         reply(ok)
     }
@@ -69,6 +71,8 @@ final class DaemonService: NSObject, NSXPCListenerDelegate, FanDaemonProtocol {
         }
         if ok {
             DaemonLog.log("[DaemonService] F\(fanIndex) restaurado al control del sistema")
+        } else {
+            DaemonLog.log("[DaemonService] ERROR: no se pudo restaurar F\(fanIndex)")
         }
         reply(ok)
     }

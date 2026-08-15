@@ -5,9 +5,13 @@ internal import Combine
 /// Cliente del daemon privilegiado de FanCTL.
 ///
 /// Conecta con el mach service `com.jg.FanCTL.daemon` y expone el control
-/// remoto del ventilador cuando el daemon está instalado y registrado.
-/// También permite iniciarlo (`SMAppService.register`) y detenerlo (el daemon
-/// sale por petición vía XPC).
+/// remoto del ventilador cuando el daemon está instalado y corriendo como root.
+///
+/// Todo el control de instalación/inicio/parada se reduce a un único método:
+/// `toggle()`, que decide según el estado real del daemon:
+/// - no instalado → lo instala (pide contraseña de administrador);
+/// - instalado pero parado → lo arranca;
+/// - corriendo → lo detiene.
 final class FanDaemonClient: ObservableObject {
     static let machServiceName = "com.jg.FanCTL.daemon"
     /// Nombre del plist dentro de `Contents/Library/LaunchDaemons` del bundle.
@@ -36,6 +40,96 @@ final class FanDaemonClient: ObservableObject {
             daemonStatus = .enabled
         } else {
             daemonStatus = smStatus
+        }
+    }
+
+    // MARK: - Botón único: Iniciar / Detener
+
+    /// Instala, arranca o detiene el daemon según su estado actual.
+    /// Pide contraseña de administrador solo cuando hace falta (instalar/arrancar).
+    func toggle() {
+        refreshStatus()
+        if isAvailable {
+            stopDaemon()
+            return
+        }
+        startDaemon()
+    }
+
+    /// Instala (si hace falta) y arranca el daemon como root. Si ya está
+    /// instalado y corriendo, solo reconecta.
+    func startDaemon() {
+        refreshStatus()
+        guard !isRequestingPermissions else { return }
+        isRequestingPermissions = true
+        lastError = nil
+        stopRequested = false
+        AppLog.log("[DaemonClient] Arrancando/instalando el daemon…")
+
+        if daemonStatus == .enabled {
+            // Ya instalado: basta con arrancar el servicio y conectar.
+            PrivilegedInstaller.start(completion: completion)
+        } else {
+            PrivilegedInstaller.install(completion: completion)
+        }
+    }
+
+    /// Detiene el daemon vía XPC (no pide contraseña).
+    func stopDaemon() {
+        stopRequested = true
+        isRequestingPermissions = false
+        guard let proxy = proxy() else {
+            connection?.invalidate()
+            connection = nil
+            isAvailable = false
+            refreshStatus()
+            return
+        }
+        proxy.shutdown { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.connection?.invalidate()
+                self?.connection = nil
+                self?.isAvailable = false
+                self?.refreshStatus()
+            }
+        }
+    }
+
+    /// Desinstala el daemon de launchd (pide contraseña de administrador) y
+    /// corta la conexión.
+    func uninstallDaemon() {
+        stopRequested = true
+        isRequestingPermissions = false
+        connection?.invalidate()
+        connection = nil
+        isAvailable = false
+        try? SMAppService.daemon(plistName: Self.plistName).unregister()
+        PrivilegedInstaller.uninstall { [weak self] ok, message in
+            DispatchQueue.main.async {
+                self?.lastError = ok ? nil : (message ?? "No se pudo desinstalar el daemon.")
+                self?.refreshStatus()
+            }
+        }
+    }
+
+    private func completion(ok: Bool, message: String?) {
+        isRequestingPermissions = false
+        if ok {
+            lastError = nil
+            stopRequested = false
+            refreshStatus()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                self?.connect()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                    guard let self else { return }
+                    if !self.isAvailable {
+                        self.lastError = "El daemon no responde tras arrancar. Revisa /Library/Logs/FanCTL/fanctl-daemon.log"
+                    }
+                }
+            }
+        } else {
+            lastError = message ?? "No se pudo completar la operación con el daemon."
+            refreshStatus()
         }
     }
 
@@ -68,7 +162,7 @@ final class FanDaemonClient: ObservableObject {
     }
 
     func ping() {
-        guard !stopRequested, let proxy = proxy() else { return }
+        guard let proxy = proxy() else { return }
         proxy.ping { [weak self] ok in
             DispatchQueue.main.async {
                 self?.isAvailable = ok
@@ -80,7 +174,7 @@ final class FanDaemonClient: ObservableObject {
     // MARK: - Control del ventilador (XPC)
 
     func setFanSpeed(fanIndex: Int, rpm: Double, completion: @escaping (Bool) -> Void) {
-        guard !stopRequested, let proxy = proxy() else {
+        guard let proxy = proxy() else {
             completion(false)
             return
         }
@@ -90,104 +184,12 @@ final class FanDaemonClient: ObservableObject {
     }
 
     func restoreSystemControl(fanIndex: Int, completion: @escaping (Bool) -> Void) {
-        guard !stopRequested, let proxy = proxy() else {
+        guard let proxy = proxy() else {
             completion(false)
             return
         }
         proxy.restoreSystemControl(fanIndex: fanIndex) { ok in
             DispatchQueue.main.async { completion(ok) }
-        }
-    }
-
-    // MARK: - Iniciar / Detener
-
-    /// Instala el daemon como root (pide contraseña de administrador) y
-    /// conecta con él.
-    func startDaemon() {
-        refreshStatus()
-        guard daemonStatus != .enabled else {
-            stopRequested = false
-            connect()
-            return
-        }
-
-        PrivilegedInstaller.install { [weak self] ok, message in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                self.isRequestingPermissions = false
-                if ok {
-                    self.lastError = nil
-                    self.stopRequested = false
-                    self.refreshStatus()
-                    // La carga del daemon es asíncrona; intentar conectar tras un momento.
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-                        guard let self else { return }
-                        self.connect()
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                            if !self.isAvailable {
-                                self.lastError = "Daemon instalado, pero no responde. Reintenta la conexión o revisa el log del daemon."
-                            }
-                        }
-                    }
-                } else {
-                    self.lastError = message ?? "No se pudo instalar el daemon."
-                    self.refreshStatus()
-                }
-            }
-        }
-    }
-
-    /// Solicita al sistema los permisos necesarios para controlar el ventilador.
-    /// Instala el daemon como root (con prompt de administrador) o conecta si
-    /// ya está instalado y activo.
-    func requestPermissions() {
-        refreshStatus()
-        if daemonStatus == .enabled {
-            stopRequested = false
-            lastError = nil
-            connect()
-            return
-        }
-        guard !isRequestingPermissions else { return }
-        isRequestingPermissions = true
-        lastError = nil
-        AppLog.log("[DaemonClient] Solicitando permisos de administrador…")
-        startDaemon()
-    }
-
-    /// Pide al daemon que termine y corta la conexión. No desinstala el daemon
-    /// (sigue registrado para volver a arrancarlo bajo demanda).
-    func stopDaemon() {
-        stopRequested = true
-        guard let proxy = proxy() else {
-            connection?.invalidate()
-            connection = nil
-            isAvailable = false
-            return
-        }
-        proxy.shutdown { [weak self] _ in
-            DispatchQueue.main.async {
-                self?.connection?.invalidate()
-                self?.connection = nil
-                self?.isAvailable = false
-                self?.refreshStatus()
-            }
-        }
-    }
-
-    /// Desinstala el daemon de launchd (pide contraseña de administrador) y
-    /// corta la conexión.
-    func uninstallDaemon() {
-        stopRequested = true
-        connection?.invalidate()
-        connection = nil
-        isAvailable = false
-        try? SMAppService.daemon(plistName: Self.plistName).unregister()
-        PrivilegedInstaller.uninstall { [weak self] ok, message in
-            DispatchQueue.main.async {
-                self?.lastError = ok ? nil : (message ?? "No se pudo desinstalar el daemon.")
-                self?.refreshStatus()
-            }
         }
     }
 

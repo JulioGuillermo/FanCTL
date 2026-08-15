@@ -8,8 +8,6 @@ struct GeneralSettingsView: View {
     @ObservedObject var daemon: FanDaemonClient
     @Environment(\.dismiss) var dismiss
 
-    @State private var actionMessage: String?
-
     private let intervalOptions: [Double] = [0.5, 1, 2, 3, 5, 10, 15, 30, 60]
 
     var body: some View {
@@ -53,7 +51,7 @@ struct GeneralSettingsView: View {
                 Text("Daemon de FanCTL")
                     .font(.headline)
 
-                Text("Un daemon con privilegios de administrador escribe la velocidad en el SMC. La primera instalación pedirá tu contraseña de administrador.")
+                Text("Un daemon con privilegios de administrador escribe la velocidad en el SMC. El botón Iniciar pide tu contraseña de administrador la primera vez.")
                     .font(.caption)
                     .foregroundColor(.secondary)
 
@@ -67,7 +65,10 @@ struct GeneralSettingsView: View {
 
                     Spacer()
 
-                    if daemon.isAvailable {
+                    if daemon.isRequestingPermissions {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else if daemon.isAvailable {
                         Text("Conectado")
                             .font(.caption2)
                             .bold()
@@ -77,7 +78,7 @@ struct GeneralSettingsView: View {
                             .foregroundColor(.green)
                             .cornerRadius(4)
                     } else {
-                        Text("Sin conexión XPC")
+                        Text("Sin conexión")
                             .font(.caption2)
                             .bold()
                             .padding(.horizontal, 6)
@@ -88,32 +89,33 @@ struct GeneralSettingsView: View {
                     }
                 }
 
-                HStack(spacing: 10) {
-                    Button("Instalar / Actualizar") { installDaemon() }
-                        .buttonStyle(.borderedProminent)
-
-                    Button("Detener") { daemon.stopDaemon() }
-                        .buttonStyle(.bordered)
-                        .disabled(!daemon.isAvailable)
-
-                    Button("Desinstalar") { uninstallDaemon() }
-                        .buttonStyle(.bordered)
-
-                    Button("Reintentar conexión") { daemon.ping() }
-                        .buttonStyle(.bordered)
+                Button(action: { daemon.toggle() }) {
+                    HStack {
+                        Image(systemName: daemon.isAvailable ? "stop.circle.fill" : "play.circle.fill")
+                        Text(primaryButtonTitle)
+                            .frame(maxWidth: .infinity)
+                    }
                 }
+                .buttonStyle(.borderedProminent)
+                .tint(daemon.isAvailable ? .red : .blue)
+                .disabled(daemon.isRequestingPermissions)
 
-                if let message = actionMessage {
-                    Text(message)
-                        .font(.caption)
+                if daemon.isRequestingPermissions {
+                    Text("Solicitando permisos de administrador… acepta el diálogo del sistema.")
+                        .font(.caption2)
                         .foregroundColor(.secondary)
                 }
 
-                if daemon.daemonStatus == .requiresApproval {
-                    Text("Aproba el daemon en Ajustes del Sistema → General → Elementos de inicio y permisos.")
-                        .font(.caption)
+                if let error = daemon.lastError {
+                    Text(error)
+                        .font(.caption2)
                         .foregroundColor(.orange)
                 }
+
+                Button("Desinstalar el daemon", role: .destructive) { uninstallDaemon() }
+                    .buttonStyle(.plain)
+                    .font(.caption)
+                    .disabled(daemon.isRequestingPermissions)
             }
 
             Spacer()
@@ -163,17 +165,13 @@ struct GeneralSettingsView: View {
         }
     }
 
-    private func installDaemon() {
-        daemon.startDaemon()
-        if let error = daemon.lastError {
-            actionMessage = error
-        } else {
-            actionMessage = "Solicitado. Revisa el diálogo de autenticación de administrador."
-        }
+    private var primaryButtonTitle: String {
+        if daemon.isAvailable { return "Detener" }
+        if daemon.daemonStatus == .enabled { return "Iniciar" }
+        return "Instalar e iniciar"
     }
 
     private func uninstallDaemon() {
         daemon.uninstallDaemon()
-        actionMessage = "Daemon desinstalado. El control pasa a depender de los permisos de la app."
     }
 }

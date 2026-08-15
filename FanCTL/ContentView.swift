@@ -137,7 +137,7 @@ struct ContentView: View {
     }
 
     private func requestControlPermissions() {
-        daemonClient.requestPermissions()
+        daemonClient.toggle()
     }
 
     private func applyFanControl() {
@@ -353,7 +353,7 @@ struct RightPanelFansView: View {
                             .foregroundColor(.secondary)
                     }
                     Spacer()
-                    Button("Activar permisos") { onRequestControl() }
+                    Button("Iniciar control") { onRequestControl() }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.small)
                         .disabled(isRequestingPermissions)

@@ -120,7 +120,7 @@ struct FanRowView: View {
                             }
                             .font(.caption2)
                         } else {
-                            Button("Activar control") { onRequestControl() }
+                            Button("Iniciar control") { onRequestControl() }
                                 .buttonStyle(.bordered)
                                 .controlSize(.small)
                         }

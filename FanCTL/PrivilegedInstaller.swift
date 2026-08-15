@@ -82,6 +82,15 @@ enum PrivilegedInstaller {
         runAsRoot(script: script, completion: completion)
     }
 
+    /// Arranca (o reinicia) un daemon ya instalado, sin tocar sus archivos.
+    static func start(completion: @escaping (_ ok: Bool, _ message: String?) -> Void) {
+        let script = """
+        launchctl kickstart -k system/com.jg.FanCTL.daemon
+        echo "FANCTL_OK"
+        """
+        runAsRoot(script: script, completion: completion)
+    }
+
     /// Detiene el daemon y elimina el plist y el binario instalados.
     static func uninstall(completion: @escaping (_ ok: Bool, _ message: String?) -> Void) {
         let script = """
