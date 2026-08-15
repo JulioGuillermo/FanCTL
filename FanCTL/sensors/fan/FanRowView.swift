@@ -1,16 +1,10 @@
-//
-//  FanRowView.swift
-//  FanCTL
-//
-//  Created by Julio Guillermo Mayo Vidal on 15/08/2026.
-//
-
-
 import SwiftUI
 
 /// Componente de interfaz de usuario para mostrar un ventilador individual
 struct FanRowView: View {
     let fan: FanInfo
+    var calculation: FanSpeedCalculation? = nil
+    var onSettings: () -> Void = {}
 
     var body: some View {
         VStack(spacing: 8) {
@@ -35,6 +29,14 @@ struct FanRowView: View {
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
+
+                Button(action: onSettings) {
+                    Image(systemName: "gearshape")
+                        .font(.title3)
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Ajustes de \(fan.name)")
             }
 
             GeometryReader { geo in
@@ -56,13 +58,34 @@ struct FanRowView: View {
             }
             .frame(height: 8)
 
+            // Resumen del control calculado a partir de los sensores seleccionados
+            if let calc = calculation, let maxTemp = calc.maxSelectedTemperature, let target = calc.targetRPM {
+                HStack {
+                    Label(String(format: "Máx: %.1f °C", maxTemp), systemImage: "thermometer")
+                        .foregroundColor(.secondary)
+
+                    Spacer()
+
+                    Text("Control: \(Int(target)) RPM")
+                        .bold()
+                        .foregroundColor(.blue)
+
+                    Spacer()
+
+                    Text(String(format: "%.0f%%", calc.normalizedValue * 100))
+                        .bold()
+                        .foregroundColor(.secondary)
+                }
+                .font(.caption2)
+            }
+
             HStack {
                 Text("Mín: \(Int(fan.minRPM))")
                 
                 Spacer()
                 
                 if let target = fan.targetRPM {
-                    Text("Obj: \(Int(target)) RPM")
+                    Text("Obj SMC: \(Int(target)) RPM")
                         .foregroundColor(.blue)
                     Spacer()
                 }
@@ -94,6 +117,10 @@ struct FanRowView: View {
             maxRPM: 6500,
             targetRPM: 2450,
             mode: .automatic
+        ), calculation: FanSpeedCalculation(
+            maxSelectedTemperature: 62.0,
+            normalizedValue: 0.53,
+            targetRPM: 4000
         ))
         
         FanRowView(fan: FanInfo(
@@ -107,5 +134,5 @@ struct FanRowView: View {
         ))
     }
     .padding()
-    .frame(width: 400)
+    .frame(width: 420)
 }

@@ -7,35 +7,36 @@ struct ContentView: View {
     @State private var connectionStatus: String = "No iniciado"
     @State private var isConnected: Bool = false
     @State private var selectedSensor: SensorInfo? = nil
+    @State private var settingsFan: FanInfo? = nil
     @State private var isScanning: Bool = false
-    @State private var autoRefreshEnabled: Bool = true
+    @State private var showingGeneralSettings: Bool = false
+    @State private var lastRefresh: Date = .distantPast
 
-    @StateObject private var sensorSelector = SensorSelectionController()
+    @StateObject private var settingsStore = SettingsStore()
 
-    // Timer para refresco continuo en vivo (ideal para Mac mini sin Sandbox)
-    private let timer = Timer.publish(every: 2.0, on: .main, in: .common).autoconnect()
+    // Ticker de 0.5s para respetar el intervalo configurado de reescaneo
+    private let ticker = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
 
     var body: some View {
         HStack(spacing: 0) {
-            // Panel Izquierdo (pequeño): Sensores Térmicos con selección
+            // Panel Izquierdo (pequeño): Sensores Térmicos en solo lectura
             LeftPanelSensorsView(
                 sensors: sensors,
-                selector: sensorSelector,
                 selectedSensor: $selectedSensor
             )
             .frame(width: 330)
 
             Divider()
 
-            // Panel Derecho (expansible): Estado de Conexión y Ventiladores
+            // Panel Derecho (expansible): Equipo, Estado y Ventiladores
             RightPanelFansView(
                 fans: fans,
                 systemInfo: SystemInfo.shared,
                 isConnected: isConnected,
                 connectionStatus: connectionStatus,
-                isScanning: isScanning,
-                autoRefreshEnabled: $autoRefreshEnabled,
-                onRefresh: refreshSensors
+                fanCalculation: fanCalculation(for:),
+                onGeneralSettings: { showingGeneralSettings = true },
+                onFanSettings: { settingsFan = $0 }
             )
             .frame(minWidth: 450, maxWidth: .infinity)
         }
@@ -43,45 +44,57 @@ struct ContentView: View {
         .onAppear {
             refreshSensors()
         }
-        .onReceive(timer) { _ in
-            if autoRefreshEnabled && !isScanning {
+        .onReceive(ticker) { _ in
+            guard !isScanning else { return }
+            let interval = settingsStore.settings.refreshInterval
+            if Date().timeIntervalSince(lastRefresh) >= interval {
                 refreshSensors()
             }
         }
         .sheet(item: $selectedSensor) { sensor in
             SensorDetailView(sensor: sensor)
         }
+        .sheet(item: $settingsFan) { fan in
+            FanSettingsView(fan: fan, sensors: sensors, store: settingsStore)
+        }
+        .sheet(isPresented: $showingGeneralSettings) {
+            GeneralSettingsView(store: settingsStore)
+        }
+    }
+
+    private func fanCalculation(for fan: FanInfo) -> FanSpeedCalculation {
+        let config = settingsStore.fanSettings(for: fan)
+        return FanSpeedCalculation.compute(fan: fan, config: config, sensors: sensors)
     }
 
     private func refreshSensors() {
+        lastRefresh = Date()
         isScanning = true
         AppLog.log("[Content] refreshSensors() iniciado")
 
         let snapshot = SensorsReader().readAll()
         self.sensors = snapshot.sensors
-        sensorSelector.updateSensors(snapshot.sensors)
         self.fans = snapshot.fans
         self.isConnected = snapshot.connectionOk
-        self.connectionStatus = snapshot.connectionOk ? "Conectado (Sin Sandbox)" : "Error de Conexión"
+        self.connectionStatus = snapshot.connectionOk ? "Conectado" : "Error de Conexión"
         AppLog.log("[Content] Sensores totales: \(snapshot.sensors.count), Ventiladores: \(snapshot.fans.count), connectionOk: \(snapshot.connectionOk)")
 
         isScanning = false
     }
 }
 
-/// Panel izquierdo compacto con la lista de sensores térmicos seleccionables
+/// Panel izquierdo compacto con la lista de sensores térmicos en solo lectura
 struct LeftPanelSensorsView: View {
     let sensors: [SensorInfo]
-    @ObservedObject var selector: SensorSelectionController
     @Binding var selectedSensor: SensorInfo?
 
     private var maxTempText: String {
-        guard let max = selector.maxTemperature else { return "—" }
+        guard let max = sensors.map(\.value).max() else { return "—" }
         return String(format: "%.1f °C", max)
     }
 
     private var maxTempColor: Color {
-        guard let max = selector.maxTemperature else { return .secondary }
+        guard let max = sensors.map(\.value).max() else { return .secondary }
         if max < 45 { return .green }
         if max < 65 { return .orange }
         return .red
@@ -101,8 +114,8 @@ struct LeftPanelSensorsView: View {
             .padding(.horizontal)
             .padding(.top)
 
-            // Máxima temperatura de los seleccionados + acciones
-            HStack(spacing: 8) {
+            // Máxima temperatura de todos los sensores
+            HStack {
                 Label(maxTempText, systemImage: "thermometer.high")
                     .font(.system(.body, design: .monospaced))
                     .bold()
@@ -110,21 +123,20 @@ struct LeftPanelSensorsView: View {
 
                 Spacer()
 
-                Button("Todo") { selector.selectAll() }
-                Button("Ninguno") { selector.selectNone() }
+                Text("\(sensors.count) activos")
+                    .font(.caption)
+                    .bold()
+                    .foregroundColor(.secondary)
             }
-            .font(.caption)
             .padding(.horizontal)
 
             Divider()
 
-            // Lista limpia de Sensores Térmicos con selección
+            // Lista limpia de Sensores Térmicos
             if !sensors.isEmpty {
                 List(sensors, id: \.id) { sensor in
                     SensorRowView(
                         sensor: sensor,
-                        isSelected: selector.isSelected(sensor),
-                        onToggleSelection: { selector.toggle(sensor) },
                         onTapDetails: { selectedSensor = sensor }
                     )
                 }
@@ -137,54 +149,59 @@ struct LeftPanelSensorsView: View {
                         .foregroundColor(.secondary)
                     Text("Sin datos de sensores")
                         .font(.headline)
-                    Text("Haz clic en 'Reescanear Ahora' para detectar lecturas térmicas.")
+                    Text("Esperando la primera lectura del hardware.")
                         .font(.caption)
                         .foregroundColor(.gray)
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-
-            // Contador de selección
-            Text("\(selector.selectedCount) / \(sensors.count) seleccionados")
-                .font(.caption2)
-                .foregroundColor(.secondary)
-                .padding(.horizontal)
-                .padding(.bottom, 6)
         }
         .background(Color.secondary.opacity(0.04))
     }
 }
 
-/// Panel derecho principal y expansible con el estado y los ventiladores
+/// Panel derecho principal y expansible con el equipo, el estado y los ventiladores
 struct RightPanelFansView: View {
     let fans: [FanInfo]
     let systemInfo: SystemInfo
     let isConnected: Bool
     let connectionStatus: String
-    let isScanning: Bool
-    @Binding var autoRefreshEnabled: Bool
-    let onRefresh: () -> Void
+    let fanCalculation: (FanInfo) -> FanSpeedCalculation
+    let onGeneralSettings: () -> Void
+    let onFanSettings: (FanInfo) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Encabezado del Panel con el equipo real detectado
             VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 10) {
-                    Image(systemName: systemInfo.type.iconName)
-                        .font(.system(size: 30))
-                        .foregroundColor(.blue)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(systemInfo.type.rawValue)
+                HStack {
+                    HStack(spacing: 10) {
+                        Image(systemName: systemInfo.type.iconName)
+                            .font(.system(size: 30))
+                            .foregroundColor(.blue)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(systemInfo.type.rawValue)
+                                .font(.title3)
+                                .bold()
+                            Text("\(systemInfo.computerName) • \(systemInfo.modelIdentifier)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    Spacer()
+
+                    Button(action: onGeneralSettings) {
+                        Image(systemName: "gearshape")
                             .font(.title3)
-                            .bold()
-                        Text("\(systemInfo.computerName) • \(systemInfo.modelIdentifier)")
-                            .font(.caption)
                             .foregroundColor(.secondary)
                     }
+                    .buttonStyle(.plain)
+                    .help("Ajustes generales")
                 }
 
-                // Indicador de Estado y Sandbox
+                // Indicador de Estado
                 HStack(spacing: 8) {
                     Circle()
                         .fill(isConnected ? Color.green : Color.red)
@@ -215,7 +232,9 @@ struct RightPanelFansView: View {
                 ScrollView {
                     VStack(spacing: 12) {
                         ForEach(fans) { fan in
-                            FanRowView(fan: fan)
+                            FanRowView(fan: fan, calculation: fanCalculation(fan)) {
+                                onFanSettings(fan)
+                            }
                         }
                     }
                     .padding(.horizontal)
@@ -241,46 +260,15 @@ struct RightPanelFansView: View {
             }
 
             Spacer()
-
-            // Interruptor de actualización en tiempo real
-            Toggle(isOn: $autoRefreshEnabled) {
-                HStack(spacing: 6) {
-                    Image(systemName: "bolt.horizontal.circle.fill")
-                        .foregroundColor(autoRefreshEnabled ? .green : .gray)
-                    Text("Monitoreo en vivo (2s)")
-                        .font(.caption)
-                        .bold()
-                }
-            }
-            .toggleStyle(.switch)
-            .padding(.horizontal)
-
-            // Botón global de rescanear
-            Button(action: onRefresh) {
-                HStack {
-                    Image(systemName: isScanning ? "arrow.clockwise.circle.fill" : "arrow.clockwise")
-                        .rotationEffect(.degrees(isScanning ? 360 : 0))
-                        .animation(isScanning ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: isScanning)
-                    Text(isScanning ? "Escaneando..." : "Reescanear Ahora")
-                        .bold()
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(isScanning)
-            .padding(.horizontal)
-            .padding(.bottom)
         }
         .background(Color.secondary.opacity(0.04))
     }
 }
 
-/// Fila individual para cada sensor térmico con checkbox de selección
+/// Fila individual para cada sensor térmico (solo lectura)
 struct SensorRowView: View {
     let sensor: SensorInfo
-    var isSelected: Bool
-    var onToggleSelection: () -> Void
-    var onTapDetails: () -> Void
+    var onTapDetails: () -> Void = {}
 
     private var temperatureColor: Color {
         if sensor.value < 45 { return .green }
@@ -290,14 +278,6 @@ struct SensorRowView: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            // Checkbox de selección
-            Button(action: onToggleSelection) {
-                Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-                    .font(.title3)
-                    .foregroundColor(isSelected ? .blue : .secondary)
-            }
-            .buttonStyle(.plain)
-
             Image(systemName: sensor.category.iconName)
                 .foregroundColor(.blue)
                 .font(.title3)
@@ -307,7 +287,6 @@ struct SensorRowView: View {
                 Text(sensor.rawKey)
                     .font(.system(.body, design: .monospaced))
                     .bold()
-                    .strikethrough(!isSelected, color: .secondary)
 
                 Text(sensor.source.rawValue)
                     .font(.caption2)
