@@ -19,8 +19,12 @@ struct FanSettings: Codable, Equatable, Identifiable {
     var minRPM: Double?
     /// Custom upper limit (RPM); `nil` = the fan's real range.
     var maxRPM: Double?
+    /// Smoothing filter enabled; blends the calculated speed with the previous one.
+    var filterEnabled: Bool
+    /// Smoothing factor 0...1: 1 = unfiltered, 0 = stays fixed at the previous speed.
+    var filterFactor: Double
 
-    init(id: Int, name: String, mode: FanMode = .automatic, maxTemperature: Double = 90, minTemperature: Double = 30, selectedSensorKeys: [String] = [], manualRPM: Double = 1500, minRPM: Double? = nil, maxRPM: Double? = nil) {
+    init(id: Int, name: String, mode: FanMode = .automatic, maxTemperature: Double = 90, minTemperature: Double = 30, selectedSensorKeys: [String] = [], manualRPM: Double = 1500, minRPM: Double? = nil, maxRPM: Double? = nil, filterEnabled: Bool = false, filterFactor: Double = 1.0) {
         self.id = id
         self.name = name
         self.mode = mode
@@ -30,10 +34,12 @@ struct FanSettings: Codable, Equatable, Identifiable {
         self.manualRPM = manualRPM
         self.minRPM = minRPM
         self.maxRPM = maxRPM
+        self.filterEnabled = filterEnabled
+        self.filterFactor = filterFactor
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, mode, maxTemperature, minTemperature, selectedSensorKeys, manualRPM, minRPM, maxRPM
+        case id, name, mode, maxTemperature, minTemperature, selectedSensorKeys, manualRPM, minRPM, maxRPM, filterEnabled, filterFactor
     }
 
     /// Preserves settings saved in previous versions (without limits).
@@ -48,6 +54,8 @@ struct FanSettings: Codable, Equatable, Identifiable {
         manualRPM = try c.decodeIfPresent(Double.self, forKey: .manualRPM) ?? 1500
         minRPM = try c.decodeIfPresent(Double.self, forKey: .minRPM)
         maxRPM = try c.decodeIfPresent(Double.self, forKey: .maxRPM)
+        filterEnabled = try c.decodeIfPresent(Bool.self, forKey: .filterEnabled) ?? false
+        filterFactor = try c.decodeIfPresent(Double.self, forKey: .filterFactor) ?? 1.0
     }
 
     /// Effective lower limit (custom or the fan's real).

@@ -112,7 +112,13 @@ struct ContentView: View {
         switch config.mode {
         case .automatic:
             let calc = FanSpeedCalculation.compute(fan: fan, config: config, sensors: sensors)
-            return calc.targetRPM ?? lowRPM
+            let target = calc.targetRPM ?? lowRPM
+            if config.filterEnabled {
+                let previous = fanController.appliedSpeeds[fan.id] ?? fan.currentRPM
+                let blended = previous * (1 - config.filterFactor) + target * config.filterFactor
+                return min(max(blended, lowRPM), highRPM)
+            }
+            return min(max(target, lowRPM), highRPM)
         case .manual:
             return min(max(config.manualRPM, lowRPM), highRPM)
         case .off:

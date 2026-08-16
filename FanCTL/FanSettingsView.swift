@@ -143,6 +143,40 @@ struct FanSettingsView: View {
                             .foregroundColor(.secondary)
                     }
                 }
+
+                Divider()
+
+                // Speed smoothing: blend the calculated speed with the previous one
+                VStack(alignment: .leading, spacing: 8) {
+                    Toggle("Speed smoothing", isOn: $config.filterEnabled)
+                        .font(.headline)
+
+                    if config.filterEnabled {
+                        HStack(spacing: 10) {
+                            Text("Fixed")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            Slider(value: $config.filterFactor, in: 0...1, step: 0.05)
+                            Text("Unfiltered")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+
+                        Text(String(
+                            format: "Speed = previous × %.0f%% + calculated × %.0f%%",
+                            (1 - config.filterFactor) * 100,
+                            config.filterFactor * 100
+                        ))
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+
+                        if config.filterFactor < 0.01 {
+                            Text("Fixed: the fan stays at its current speed.")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
             }
 
             Divider()

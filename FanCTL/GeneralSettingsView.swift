@@ -82,6 +82,16 @@ struct GeneralSettingsView: View {
                 }
 
                 if !sensors.isEmpty {
+                    HStack {
+                        Text("Sensors: \(store.settings.maxTempSensorKeys.count)/\(sensors.count)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Button("All") { store.setMaxTempSensorKeys(sensors.map(\.id)) }
+                        Button("None") { store.setMaxTempSensorKeys([]) }
+                    }
+                    .font(.caption)
+
                     List(sortedSensors(sensors, by: sortMode), id: \.id) { sensor in
                         SensorCheckRow(
                             sensor: sensor,
