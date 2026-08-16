@@ -48,25 +48,3 @@ final class FanSpinner {
         return angle
     }
 }
-
-/// Animated fan icon: spins at a speed proportional to the percentage.
-///
-/// The rotation angle is ACCUMULATED frame by frame (angle += speed × dt)
-/// instead of being derived from absolute time, so an update of the
-/// percentage changes only the rotation speed and never resets or jumps
-/// the icon.
-struct SpinningFanIcon: View {
-    var id: String = "fan"
-    var percentage: Double = 1
-
-    var body: some View {
-        TimelineView(.animation) { context in
-            let angle = FanSpinner.shared(for: id).advance(
-                to: TemperatureIndicator.spinSpeed(forPercentage: percentage),
-                at: context.date
-            )
-            return Image(systemName: "fanblades.fill")
-                .rotationEffect(.degrees(angle))
-        }
-    }
-}

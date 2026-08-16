@@ -28,7 +28,7 @@ public struct FanList: View {
                 GlassEffectContainer(spacing: 12) {
                     VStack(spacing: 12) {
                         ForEach(fans) { fan in
-                            FanRowView(
+                            FanListItem(
                                 fan: fan,
                                 mode: modeFor(fan),
                                 desiredRPM: desiredRPMFor(fan),

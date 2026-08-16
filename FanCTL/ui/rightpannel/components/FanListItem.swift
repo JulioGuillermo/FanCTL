@@ -1,7 +1,13 @@
+//
+//  FanListItem.swift
+//  FanCTL
+//
+//  Created by Julio Guillermo Mayo Vidal on 16/08/2026.
+//
+
 import SwiftUI
 
-/// UI component to display and control a fan.
-struct FanRowView: View {
+public struct FanListItem: View {
     let fan: FanInfo
     var mode: FanMode = .automatic
     var desiredRPM: Double? = nil
@@ -15,40 +21,10 @@ struct FanRowView: View {
     var onRequestControl: () -> Void = {}
     var onSettings: () -> Void = {}
 
-    var body: some View {
+    public var body: some View {
         VStack(spacing: 8) {
-            HStack {
-                SpinningFanIcon(id: String(fan.id), percentage: fan.percentage)
-                    .foregroundColor(fan.statusColor)
-                    .font(.system(size: 16))
+            FanMainInfo(fan: fan, onSettings: onSettings)
 
-                Text(fan.name)
-                    .bold()
-                    .font(.body)
-
-                Spacer()
-
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text("\(Int(fan.currentRPM))")
-                        .font(.system(.title3, design: .monospaced))
-                        .bold()
-                        .foregroundColor(fan.statusColor)
-
-                    Text("RPM")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-
-                Button(action: onSettings) {
-                    Image(systemName: "gearshape")
-                        .font(.title3)
-                        .foregroundColor(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help("Settings for \(fan.name)")
-            }
-
-            // Control mode selector as a floating glass pill
             SelectorLiquidGlass(
                 mode: Binding(
                     get: { mode },
@@ -59,17 +35,20 @@ struct FanRowView: View {
 
             // Manual speed slider
             if mode == .manual {
-            HStack(spacing: 10) {
-                Text("Speed")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                HStack(spacing: 10) {
+                    Text("Speed")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
 
                     Slider(
                         value: Binding(
                             get: { manualRPM },
                             set: { onManualRPMChange($0) }
                         ),
-                        in: (minSpeedRPM ?? fan.minRPM)...max((maxSpeedRPM ?? fan.maxRPM), (minSpeedRPM ?? fan.minRPM)),
+                        in: (minSpeedRPM ?? fan.minRPM)...max(
+                            (maxSpeedRPM ?? fan.maxRPM),
+                            (minSpeedRPM ?? fan.minRPM)
+                        ),
                         step: 50
                     )
 
@@ -95,7 +74,10 @@ struct FanRowView: View {
                                 endPoint: .trailing
                             )
                         )
-                        .frame(width: geo.size.width * CGFloat(fan.percentage), height: 8)
+                        .frame(
+                            width: geo.size.width * CGFloat(fan.percentage),
+                            height: 8
+                        )
                 }
             }
             .frame(height: 8)
@@ -103,9 +85,12 @@ struct FanRowView: View {
             // Speed being applied according to the mode
             if let desired = desiredRPM {
                 HStack {
-                    Label(String(format: "Control: %d RPM", Int(desired)), systemImage: mode.iconName)
-                        .bold()
-                        .foregroundColor(controlActive ? .blue : .secondary)
+                    Label(
+                        String(format: "Control: %d RPM", Int(desired)),
+                        systemImage: mode.iconName
+                    )
+                    .bold()
+                    .foregroundColor(controlActive ? .blue : .secondary)
 
                     Spacer()
 
@@ -150,14 +135,10 @@ struct FanRowView: View {
             .foregroundColor(.secondary)
         }
         .padding(12)
-        // Clear variant: nearly transparent so light passes through, but the
-        // refraction/distortion of the animated background is preserved. The
-        // dark tint gives the glass more body and the deep shadow lifts it
-        // away from the background, increasing the perceived thickness.
-        .glassEffect(.clear.tint(.black.opacity(0.60)), in: RoundedRectangle(cornerRadius: 14))
-        // Simulated edge thickness (the public API has no thickness/IOR
-        // control): a beveled rim catches the light on top and darkens at the
-        // bottom, like the ground edge of a thick glass pane.
+        .glassEffect(
+            .clear.tint(.black.opacity(0.60)),
+            in: RoundedRectangle(cornerRadius: 14)
+        )
         .overlay {
             RoundedRectangle(cornerRadius: 14)
                 .strokeBorder(
@@ -165,7 +146,7 @@ struct FanRowView: View {
                         colors: [
                             .white.opacity(0.50),
                             .white.opacity(0.15),
-                            .black.opacity(0.30)
+                            .black.opacity(0.30),
                         ],
                         startPoint: .top,
                         endPoint: .bottom
@@ -179,7 +160,7 @@ struct FanRowView: View {
 
 #Preview {
     VStack(spacing: 12) {
-        FanRowView(
+        FanListItem(
             fan: FanInfo(
                 id: 0,
                 name: "Main Fan",
@@ -195,7 +176,7 @@ struct FanRowView: View {
             controlActive: true
         )
 
-        FanRowView(
+        FanListItem(
             fan: FanInfo(
                 id: 1,
                 name: "Secondary Fan (GPU)",

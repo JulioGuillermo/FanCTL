@@ -20,7 +20,13 @@ struct SelectorLiquidGlass: View {
                 let isActive = mode == candidate
 
                 Button {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.65, blendDuration: 0)) {
+                    withAnimation(
+                        .spring(
+                            response: 0.35,
+                            dampingFraction: 0.65,
+                            blendDuration: 0
+                        )
+                    ) {
                         if !isActive {
                             onChange(candidate)
                         }
@@ -31,7 +37,9 @@ struct SelectorLiquidGlass: View {
                         Text(candidate.rawValue)
                             .font(.system(size: 13, weight: .medium))
                     }
-                    .foregroundColor(isActive ? .white : .white.opacity(0.6))
+                    .foregroundColor(
+                        isActive ? .white : .white.opacity(0.6)
+                    )
                     .padding(.vertical, 8)
                     .padding(.horizontal, 16)
                     .frame(minWidth: 90)
@@ -42,27 +50,21 @@ struct SelectorLiquidGlass: View {
                     if isActive {
                         Capsule()
                             .fill(Color.blue.opacity(0.85))
-                            .overlay(
-                                Capsule()
-                                    .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
+                            .matchedGeometryEffect(
+                                id: "fondoFluido",
+                                in: animacionLiquid
                             )
-                            .matchedGeometryEffect(id: "fondoFluido", in: animacionLiquid)
                     }
                 }
             }
+            
         }
-        .padding(4)
-        // Base translucent dark capsule container
-        .background(
-            Capsule()
-                .fill(Color.black.opacity(0.25))
-                .background(.ultraThinMaterial)
-        )
-        .overlay(
-            Capsule()
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+        .padding(0)
+        .glassEffect(
+            .regular,
+            in: Capsule()
+
         )
         .clipShape(Capsule())
-        .shadow(color: .black.opacity(0.25), radius: 8, x: 0, y: 4)
     }
 }

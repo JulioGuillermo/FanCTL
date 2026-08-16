@@ -25,14 +25,14 @@ enum TemperatureIndicator {
     static func tempColor(for temperature: Double) -> Color {
         let min = 50.0
         let max = 75.0
-        return fluidColor(forPercentage: (temperature - min) / (max - min))
+        return fluidColorG(forPercentage: (temperature - min) / (max - min))
     }
 
     static func spinSpeed(forPercentage percentage: Double) -> Double {
         1 + max(0, min(percentage, 1)) * 4
     }
     
-    static func fluidColor(forPercentage percentage: Double) -> Color {
+    static func fluidColorG(forPercentage percentage: Double) -> Color {
         let p = max(0, min(percentage, 1))
         
         if p < 0.5 {
@@ -48,6 +48,26 @@ enum TemperatureIndicator {
                 red: 1,
                 green: 1 - p,
                 blue: 0,
+            )
+        }
+    }
+    
+    static func fluidColorB(forPercentage percentage: Double) -> Color {
+        let p = max(0, min(percentage, 1))
+        
+        if p < 0.5 {
+            let p = p * 2
+            return Color(
+                red: p,
+                green: 0.7,
+                blue: 1
+            )
+        } else {
+            let p = (p - 0.5) * 2
+            return Color(
+                red: 1,
+                green: 0.7,
+                blue: 1 - p,
             )
         }
     }
