@@ -117,7 +117,7 @@ final class StatusBarController: ObservableObject {
                 to: TemperatureIndicator.spinSpeed(forPercentage: percentage),
                 at: Date()
             )
-            let color = NSColor(TemperatureIndicator.speedColor(forPercentage: percentage))
+            let color = NSColor(TemperatureIndicator.fluidColor(forPercentage: percentage))
             attr.append(NSAttributedString(attachment: animatedFanAttachment(size: 13, angle: angle, color: color)))
             let rpmText = rpmValues.map { String(Int($0)) }.joined(separator: "/")
             attr.append(NSAttributedString(string: " \(rpmText)"))
