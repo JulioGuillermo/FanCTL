@@ -46,5 +46,6 @@ public struct FanSettingsTitle: View {
             .buttonStyle(.plain)
             .help("Close settings")
         }
+        .padding(10)
     }
 }

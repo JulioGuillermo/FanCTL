@@ -13,7 +13,6 @@ extension View {
     /// transparent settings windows.
     func liquidGlassPanel(cornerRadius: CGFloat = 24) -> some View {
         self
-            .padding(24)
             .background(.ultraThinMaterial)
             .cornerRadius(cornerRadius)
             .overlay(

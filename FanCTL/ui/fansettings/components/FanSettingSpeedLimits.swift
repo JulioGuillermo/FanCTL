@@ -9,10 +9,9 @@ import SwiftUI
 
 public struct FanSettingSpeedLimits: View {
     let fan: FanInfo
-    @State var config: FanSettings
-
-    private var effMin: Double { config.minRPM ?? fan.minRPM }
-    private var effMax: Double { config.maxRPM ?? fan.maxRPM }
+    let effMin: Double
+    let effMax: Double
+    @Binding var config: FanSettings
 
     private var minRPMBinding: Binding<Double> {
         Binding(
@@ -45,8 +44,12 @@ public struct FanSettingSpeedLimits: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Toggle("Limit speed range", isOn: isCustomRangeBinding)
-                .font(.headline)
+            HStack {
+                Toggle("Limit speed range", isOn: isCustomRangeBinding)
+                    .font(.headline)
+                
+                Spacer()
+            }
 
             if config.minRPM != nil || config.maxRPM != nil {
                 speedRangeRow(
@@ -65,6 +68,7 @@ public struct FanSettingSpeedLimits: View {
                 .foregroundColor(.secondary)
             }
         }
+        .padding(10)
     }
 
     private func speedRangeRow(label: String, value: Binding<Double>)
@@ -73,14 +77,14 @@ public struct FanSettingSpeedLimits: View {
         HStack {
             Text(label)
                 .foregroundColor(.secondary)
-            
+
             Spacer()
-            
+
             TextField("", value: value, format: .number)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 80)
                 .multilineTextAlignment(.trailing)
-            
+
             Stepper("", value: value, in: 0...10000, step: 50)
                 .labelsHidden()
         }

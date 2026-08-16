@@ -24,18 +24,12 @@ public struct FanSettingsView: View {
         _config = State(initialValue: store.fanSettings(for: fan))
     }
 
-    private var calculation: FanSpeedCalculation {
-        FanSpeedCalculation.compute(fan: fan, config: config, sensors: sensors)
-    }
-
     private var temperatureSensors: [SensorInfo] {
         sensors.filter(\.isTemperature)
     }
 
-    private var selectedCount: Int {
-        temperatureSensors.filter { config.selectedSensorKeys.contains($0.id) }
-            .count
-    }
+    private var effMin: Double { config.minRPM ?? fan.minRPM }
+    private var effMax: Double { config.maxRPM ?? fan.maxRPM }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -47,36 +41,27 @@ public struct FanSettingsView: View {
                 VStack {
                     FanSettingSpeedLimits(
                         fan: fan,
-                        config: config
+                        effMin: effMin,
+                        effMax: effMax,
+                        config: $config
                     )
 
                     if config.mode == .automatic {
                         Divider()
 
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Temperatures to maintain")
-                                .font(.headline)
-
-                            temperatureRow(
-                                label: "Max temperature (°C)",
-                                value: $config.maxTemperature
-                            )
-                            temperatureRow(
-                                label: "Min temperature (°C)",
-                                value: $config.minTemperature
-                            )
-
-                            Text(
-                                "Below the minimum the speed is minimal; above the maximum, maximal."
-                            )
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                        }
+                        FanSettingTempLimits(config: $config)
                     }
 
                     Spacer()
-                    
-                    summarySection
+
+                    FanSettingSummary(
+                        fan: fan,
+                        config: config,
+                        sensors: sensors,
+                        temperatureSensors: temperatureSensors,
+                        effMin: effMin,
+                        effMax: effMax
+                    )
                 }
                 .padding(14)
                 .frame(width: 300)
@@ -238,82 +223,6 @@ public struct FanSettingsView: View {
             )
             .font(.caption2)
             .foregroundColor(.secondary)
-        }
-    }
-
-    private var summarySection: some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                if config.mode == .automatic {
-                    Text(
-                        "Sensors: \(selectedCount)/\(temperatureSensors.count)"
-                    )
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    if let maxTemp = calculation.maxSelectedTemperature {
-                        Text(String(format: "Max: %.1f °C", maxTemp))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                } else {
-                    Text("Mode: \(config.mode.rawValue)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 2) {
-                if config.mode == .automatic {
-                    Text(
-                        String(
-                            format: "Normalized: %.0f%%",
-                            calculation.normalizedValue * 100
-                        )
-                    )
-                    .font(.caption)
-                    .bold()
-                }
-                if let target = summaryTargetRPM {
-                    Text("Target speed: \(Int(target)) RPM")
-                        .font(.caption)
-                        .bold()
-                        .foregroundColor(.blue)
-                }
-            }
-        }
-        .padding(10)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 10))
-    }
-
-    private var summaryTargetRPM: Double? {
-        switch config.mode {
-        case .automatic:
-            return calculation.targetRPM
-        case .manual:
-            return config.manualRPM
-        case .off:
-            return effMin
-        case .maximum:
-            return effMax
-        }
-    }
-
-    private var effMin: Double { config.minRPM ?? fan.minRPM }
-    private var effMax: Double { config.maxRPM ?? fan.maxRPM }
-
-    private func temperatureRow(label: String, value: Binding<Double>)
-        -> some View
-    {
-        HStack {
-            Text(label)
-                .foregroundColor(.secondary)
-            Spacer()
-            TextField("", value: value, format: .number)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 80)
-                .multilineTextAlignment(.trailing)
-            Stepper("", value: value, in: 0...150, step: 1)
-                .labelsHidden()
         }
     }
 
