@@ -81,7 +81,7 @@ public struct FanSettingsView: View {
                         )
                     } else if config.mode == .automatic {
                         FanSettingSmoothing(config: $config)
-                        
+
                         Divider()
 
                         FanSettingSensorList(temperatureSensors: sensors, config: $config)
@@ -97,8 +97,7 @@ public struct FanSettingsView: View {
         )
         .onAppear {
             // By default, if there is no saved selection, select all sensors
-            if config.selectedSensorKeys.isEmpty && !temperatureSensors.isEmpty
-            {
+            if config.selectedSensorKeys.isEmpty && !temperatureSensors.isEmpty {
                 config.selectedSensorKeys = temperatureSensors.map(\.id)
             }
             if config.manualRPM < fan.minRPM || config.manualRPM > fan.maxRPM {

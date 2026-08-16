@@ -121,6 +121,7 @@ struct SensorSelectionList: View {
             )
         }
         .listStyle(.plain)
+        .scrollContentBackground(.hidden)
     }
 
     private var groupedList: some View {
@@ -153,6 +154,7 @@ struct SensorSelectionList: View {
             }
         }
         .listStyle(.plain)
+        .scrollContentBackground(.hidden)
     }
 
     private func toggleExpansion(_ category: String) {
