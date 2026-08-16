@@ -15,8 +15,12 @@ struct FanSettings: Codable, Equatable, Identifiable {
     var selectedSensorKeys: [String]
     /// Velocidad fija en RPM para el modo manual.
     var manualRPM: Double
+    /// Límite inferior personalizado (RPM); `nil` = rango real del ventilador.
+    var minRPM: Double?
+    /// Límite superior personalizado (RPM); `nil` = rango real del ventilador.
+    var maxRPM: Double?
 
-    init(id: Int, name: String, mode: FanMode = .automatic, maxTemperature: Double = 90, minTemperature: Double = 30, selectedSensorKeys: [String] = [], manualRPM: Double = 1500) {
+    init(id: Int, name: String, mode: FanMode = .automatic, maxTemperature: Double = 90, minTemperature: Double = 30, selectedSensorKeys: [String] = [], manualRPM: Double = 1500, minRPM: Double? = nil, maxRPM: Double? = nil) {
         self.id = id
         self.name = name
         self.mode = mode
@@ -24,7 +28,33 @@ struct FanSettings: Codable, Equatable, Identifiable {
         self.minTemperature = minTemperature
         self.selectedSensorKeys = selectedSensorKeys
         self.manualRPM = manualRPM
+        self.minRPM = minRPM
+        self.maxRPM = maxRPM
     }
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, mode, maxTemperature, minTemperature, selectedSensorKeys, manualRPM, minRPM, maxRPM
+    }
+
+    /// Conserva los ajustes guardados en versiones anteriores (sin límites).
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        mode = try c.decode(FanMode.self, forKey: .mode)
+        maxTemperature = try c.decodeIfPresent(Double.self, forKey: .maxTemperature) ?? 90
+        minTemperature = try c.decodeIfPresent(Double.self, forKey: .minTemperature) ?? 30
+        selectedSensorKeys = try c.decodeIfPresent([String].self, forKey: .selectedSensorKeys) ?? []
+        manualRPM = try c.decodeIfPresent(Double.self, forKey: .manualRPM) ?? 1500
+        minRPM = try c.decodeIfPresent(Double.self, forKey: .minRPM)
+        maxRPM = try c.decodeIfPresent(Double.self, forKey: .maxRPM)
+    }
+
+    /// Límite inferior efectivo (personalizado o real del ventilador).
+    func effectiveMinRPM(fanMinRPM: Double) -> Double { minRPM ?? fanMinRPM }
+
+    /// Límite superior efectivo (personalizado o real del ventilador).
+    func effectiveMaxRPM(fanMaxRPM: Double) -> Double { maxRPM ?? fanMaxRPM }
 }
 
 /// Ajustes generales y por ventilador de la app.

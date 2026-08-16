@@ -28,8 +28,12 @@ struct FanSpeedCalculation {
         normalized = min(1, max(0, normalized))
 
         // Aplicar el mismo factor al rango de velocidad del ventilador
-        let speedRange = fan.maxRPM - fan.minRPM
-        let targetRPM = fan.minRPM + normalized * speedRange
+        // (o al rango personalizado configurado por el usuario, si existe).
+        let lowRPM = config.effectiveMinRPM(fanMinRPM: fan.minRPM)
+        let highRPM = config.effectiveMaxRPM(fanMaxRPM: fan.maxRPM)
+        let speedRange = max(highRPM - lowRPM, 0)
+        var targetRPM = lowRPM + normalized * speedRange
+        targetRPM = min(max(targetRPM, fan.minRPM), fan.maxRPM)
 
         return FanSpeedCalculation(
             maxSelectedTemperature: maxTemp,

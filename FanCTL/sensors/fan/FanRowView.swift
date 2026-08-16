@@ -6,6 +6,8 @@ struct FanRowView: View {
     var mode: FanMode = .automatic
     var desiredRPM: Double? = nil
     var manualRPM: Double = 1500
+    var minSpeedRPM: Double? = nil
+    var maxSpeedRPM: Double? = nil
     var controlActive: Bool = false
     var isRequestingPermissions: Bool = false
     var onChangeMode: (FanMode) -> Void = { _ in }
@@ -71,7 +73,7 @@ struct FanRowView: View {
                             get: { manualRPM },
                             set: { onManualRPMChange($0) }
                         ),
-                        in: fan.minRPM...max(fan.minRPM, fan.maxRPM),
+                        in: (minSpeedRPM ?? fan.minRPM)...max((maxSpeedRPM ?? fan.maxRPM), (minSpeedRPM ?? fan.minRPM)),
                         step: 50
                     )
 

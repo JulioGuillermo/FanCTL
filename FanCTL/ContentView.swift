@@ -46,6 +46,8 @@ struct ContentView: View {
                 modeFor: mode(for:),
                 desiredRPMFor: desiredRPM(for:),
                 manualRPMFor: manualRPM(for:),
+                minSpeedRPMFor: minSpeedRPM(for:),
+                maxSpeedRPMFor: maxSpeedRPM(for:),
                 onChangeMode: { fan, mode in
                     changeMode(mode, for: fan)
                 },
@@ -104,22 +106,32 @@ struct ContentView: View {
 
     private func desiredRPM(for fan: FanInfo) -> Double {
         let config = settingsStore.fanSettings(for: fan)
+        let lowRPM = config.effectiveMinRPM(fanMinRPM: fan.minRPM)
+        let highRPM = config.effectiveMaxRPM(fanMaxRPM: fan.maxRPM)
         switch config.mode {
         case .automatic:
             let calc = FanSpeedCalculation.compute(fan: fan, config: config, sensors: sensors)
-            return calc.targetRPM ?? fan.minRPM
+            return calc.targetRPM ?? lowRPM
         case .manual:
-            return min(max(config.manualRPM, fan.minRPM), fan.maxRPM)
+            return min(max(config.manualRPM, lowRPM), highRPM)
         case .off:
-            return fan.minRPM
+            return lowRPM
         case .maximum:
-            return fan.maxRPM
+            return highRPM
         }
     }
 
     private func manualRPM(for fan: FanInfo) -> Double {
         let config = settingsStore.fanSettings(for: fan)
-        return min(max(config.manualRPM, fan.minRPM), fan.maxRPM)
+        return min(max(config.manualRPM, config.effectiveMinRPM(fanMinRPM: fan.minRPM)), config.effectiveMaxRPM(fanMaxRPM: fan.maxRPM))
+    }
+
+    private func minSpeedRPM(for fan: FanInfo) -> Double {
+        settingsStore.fanSettings(for: fan).effectiveMinRPM(fanMinRPM: fan.minRPM)
+    }
+
+    private func maxSpeedRPM(for fan: FanInfo) -> Double {
+        settingsStore.fanSettings(for: fan).effectiveMaxRPM(fanMaxRPM: fan.maxRPM)
     }
 
     private func changeMode(_ mode: FanMode, for fan: FanInfo) {
@@ -131,7 +143,7 @@ struct ContentView: View {
 
     private func changeManualRPM(_ rpm: Double, for fan: FanInfo) {
         var config = settingsStore.fanSettings(for: fan)
-        config.manualRPM = min(max(rpm, fan.minRPM), fan.maxRPM)
+        config.manualRPM = min(max(rpm, config.effectiveMinRPM(fanMinRPM: fan.minRPM)), config.effectiveMaxRPM(fanMaxRPM: fan.maxRPM))
         settingsStore.updateFanSettings(config)
     }
 
@@ -265,6 +277,8 @@ struct RightPanelFansView: View {
     let modeFor: (FanInfo) -> FanMode
     let desiredRPMFor: (FanInfo) -> Double
     let manualRPMFor: (FanInfo) -> Double
+    let minSpeedRPMFor: (FanInfo) -> Double
+    let maxSpeedRPMFor: (FanInfo) -> Double
     let onChangeMode: (FanInfo, FanMode) -> Void
     let onManualRPMChange: (FanInfo, Double) -> Void
     let onGeneralSettings: () -> Void
@@ -392,6 +406,8 @@ struct RightPanelFansView: View {
                                 mode: modeFor(fan),
                                 desiredRPM: desiredRPMFor(fan),
                                 manualRPM: manualRPMFor(fan),
+                                minSpeedRPM: minSpeedRPMFor(fan),
+                                maxSpeedRPM: maxSpeedRPMFor(fan),
                                 controlActive: controlActive,
                                 isRequestingPermissions: isRequestingPermissions,
                                 onChangeMode: { onChangeMode(fan, $0) },

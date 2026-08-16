@@ -80,6 +80,23 @@ struct FanSettingsView: View {
 
             Divider()
 
+            // Rango de velocidad configurable (aplica a todos los modos)
+            VStack(alignment: .leading, spacing: 8) {
+                Toggle("Limitar rango de velocidad", isOn: isCustomRangeBinding)
+                    .font(.headline)
+
+                if config.minRPM != nil || config.maxRPM != nil {
+                    speedRangeRow(label: "Vel. mínima (RPM)", value: minRPMBinding)
+                    speedRangeRow(label: "Vel. máxima (RPM)", value: maxRPMBinding)
+
+                    Text("Dentro del rango real del ventilador: \(Int(fan.minRPM)) – \(Int(fan.maxRPM)) RPM. Útil para alargar la vida del ventilador.")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            Divider()
+
             // Rango de temperatura a mantener (solo aplica en modo Auto)
             if config.mode == .automatic {
                 VStack(alignment: .leading, spacing: 8) {
@@ -165,7 +182,7 @@ struct FanSettingsView: View {
                 Spacer()
                 TextField("RPM", value: Binding(
                     get: { config.manualRPM },
-                    set: { config.manualRPM = min(max($0, fan.minRPM), fan.maxRPM) }
+                    set: { config.manualRPM = min(max($0, effMin), effMax) }
                 ), format: .number)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 80)
@@ -177,11 +194,11 @@ struct FanSettingsView: View {
                     get: { config.manualRPM },
                     set: { config.manualRPM = $0 }
                 ),
-                in: fan.minRPM...max(fan.minRPM, fan.maxRPM),
+                in: effMin...max(effMax, effMin),
                 step: 50
             )
 
-            Text("Rango del ventilador: \(Int(fan.minRPM)) – \(Int(fan.maxRPM)) RPM")
+            Text("Rango: \(Int(effMin)) – \(Int(effMax)) RPM (real del ventilador: \(Int(fan.minRPM)) – \(Int(fan.maxRPM)))")
                 .font(.caption2)
                 .foregroundColor(.secondary)
         }
@@ -232,10 +249,42 @@ struct FanSettingsView: View {
         case .manual:
             return config.manualRPM
         case .off:
-            return fan.minRPM
+            return effMin
         case .maximum:
-            return fan.maxRPM
+            return effMax
         }
+    }
+
+    private var effMin: Double { config.minRPM ?? fan.minRPM }
+    private var effMax: Double { config.maxRPM ?? fan.maxRPM }
+
+    private var isCustomRangeBinding: Binding<Bool> {
+        Binding(
+            get: { config.minRPM != nil || config.maxRPM != nil },
+            set: { enabled in
+                if enabled {
+                    if config.minRPM == nil { config.minRPM = fan.minRPM }
+                    if config.maxRPM == nil { config.maxRPM = fan.maxRPM }
+                } else {
+                    config.minRPM = nil
+                    config.maxRPM = nil
+                }
+            }
+        )
+    }
+
+    private var minRPMBinding: Binding<Double> {
+        Binding(
+            get: { config.minRPM ?? fan.minRPM },
+            set: { config.minRPM = min(max($0, fan.minRPM), effMax - 50) }
+        )
+    }
+
+    private var maxRPMBinding: Binding<Double> {
+        Binding(
+            get: { config.maxRPM ?? fan.maxRPM },
+            set: { config.maxRPM = max(min($0, fan.maxRPM), effMin + 50) }
+        )
     }
 
     private func temperatureRow(label: String, value: Binding<Double>) -> some View {
@@ -248,6 +297,20 @@ struct FanSettingsView: View {
                 .frame(width: 80)
                 .multilineTextAlignment(.trailing)
             Stepper("", value: value, in: 0...150, step: 1)
+                .labelsHidden()
+        }
+    }
+
+    private func speedRangeRow(label: String, value: Binding<Double>) -> some View {
+        HStack {
+            Text(label)
+                .foregroundColor(.secondary)
+            Spacer()
+            TextField("", value: value, format: .number)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 80)
+                .multilineTextAlignment(.trailing)
+            Stepper("", value: value, in: 0...10000, step: 50)
                 .labelsHidden()
         }
     }
