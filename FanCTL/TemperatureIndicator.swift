@@ -24,14 +24,75 @@ enum TemperatureIndicator {
     static func spinSpeed(forPercentage percentage: Double) -> Double {
         1 + max(0, min(percentage, 1)) * 4
     }
+
+    /// Color gradient as a function of the fan speed percentage (0...1):
+    /// green at low speed, orange in the middle, red at full speed.
+    static func speedColor(forPercentage percentage: Double) -> Color {
+        let p = max(0, min(percentage, 1))
+        let stops: [(pos: Double, r: Double, g: Double, b: Double)] = [
+            (0.0, 0.22, 0.80, 0.35),
+            (0.4, 0.95, 0.62, 0.08),
+            (0.7, 0.95, 0.25, 0.20),
+        ]
+        for i in 0..<(stops.count - 1) {
+            let a = stops[i]
+            let b = stops[i + 1]
+            if p <= b.pos {
+                let t = (p - a.pos) / max(b.pos - a.pos, 1e-9)
+                return Color(red: a.r + (b.r - a.r) * t,
+                             green: a.g + (b.g - a.g) * t,
+                             blue: a.b + (b.b - a.b) * t)
+            }
+        }
+        let last = stops[stops.count - 1]
+        return Color(red: last.r, green: last.g, blue: last.b)
+    }
 }
 
-/// Mutable state of the fan animation, kept across frames without triggering
+/// Mutable state of a fan animation, kept across frames without triggering
 /// SwiftUI invalidations (TimelineView drives the frames by itself).
-private final class FanSpinner {
+///
+/// The spinner state lives in a STATIC registry keyed by `id` (not in
+/// `@State`): a parent re-render can rebuild the view struct, and relying on
+/// `@State` would reset the accumulated angle on every refresh, breaking the
+/// animation. The registry survives rebuilds and guarantees continuity.
+final class FanSpinner {
     var angle: Double = 0
     var lastDate: Date?
     var currentRevsPerSec: Double = 1
+
+    private static var spinners: [String: FanSpinner] = [:]
+
+    /// Returns the spinner that persists for the given `id`. Shared between
+    /// the SwiftUI fan icon and the menu bar indicator so both rotate
+    /// continuously.
+    static func shared(for id: String) -> FanSpinner {
+        if spinners[id] == nil {
+            spinners[id] = FanSpinner()
+        }
+        return spinners[id]!
+    }
+
+    /// Advances the rotation using the accumulated-angle model (never jumps).
+    /// Eases the angular speed toward `targetRevs` (≈0.5s time constant) so
+    /// RPM changes from periodic refreshes glide into each other instead of
+    /// snapping the rotation speed at each update.
+    /// - Returns: the current rotation angle in degrees.
+    func advance(to targetRevs: Double, at now: Date) -> Double {
+        if let last = lastDate {
+            // Clamp dt so a long pause (e.g. app in background) cannot
+            // produce a giant angle jump on the next frame.
+            let dt = max(0, min(now.timeIntervalSince(last), 0.1))
+            if dt > 0 {
+                let ease = 1 - exp(-2 * dt)
+                currentRevsPerSec += (targetRevs - currentRevsPerSec) * ease
+                angle = (angle + dt * currentRevsPerSec * 360)
+                    .truncatingRemainder(dividingBy: 360)
+            }
+        }
+        lastDate = now
+        return angle
+    }
 }
 
 /// Animated fan icon: spins at a speed proportional to the percentage.
@@ -40,49 +101,18 @@ private final class FanSpinner {
 /// instead of being derived from absolute time, so an update of the
 /// percentage changes only the rotation speed and never resets or jumps
 /// the icon.
-///
-/// The spinner state lives in a STATIC dictionary keyed by `id` (not in
-/// `@State`): a parent re-render can rebuild the view struct, and relying on
-/// `@State` would reset the accumulated angle on every refresh, breaking the
-/// animation. The dictionary survives rebuilds and guarantees continuity.
 struct SpinningFanIcon: View {
     var id: String = "fan"
     var percentage: Double = 1
 
-    private static var spinners: [String: FanSpinner] = [:]
-
-    private var spinner: FanSpinner {
-        if Self.spinners[id] == nil {
-            Self.spinners[id] = FanSpinner()
-        }
-        return Self.spinners[id]!
-    }
-
     var body: some View {
         TimelineView(.animation) { context in
-            let now = context.date
-            let targetRevs = TemperatureIndicator.spinSpeed(forPercentage: percentage)
-            let state = spinner
-
-            if let last = state.lastDate {
-                // Clamp dt so a long pause (e.g. app in background) cannot
-                // produce a giant angle jump on the next frame.
-                let dt = max(0, min(now.timeIntervalSince(last), 0.1))
-                if dt > 0 {
-                    // Ease the angular speed toward the target. The constant is
-                    // gentle (≈0.5s time constant) so RPM changes coming from
-                    // periodic refreshes glide into each other instead of
-                    // snapping the rotation speed at each update.
-                    let ease = 1 - exp(-2 * dt)
-                    state.currentRevsPerSec += (targetRevs - state.currentRevsPerSec) * ease
-                    state.angle = (state.angle + dt * state.currentRevsPerSec * 360)
-                        .truncatingRemainder(dividingBy: 360)
-                }
-            }
-            state.lastDate = now
-
+            let angle = FanSpinner.shared(for: id).advance(
+                to: TemperatureIndicator.spinSpeed(forPercentage: percentage),
+                at: context.date
+            )
             return Image(systemName: "fanblades.fill")
-                .rotationEffect(.degrees(state.angle))
+                .rotationEffect(.degrees(angle))
         }
     }
 }

@@ -15,6 +15,10 @@ final class StatusBarController: ObservableObject {
     private let menuTarget = AppMenuTarget()
     private var cancellables = Set<AnyCancellable>()
 
+    /// Drives the fan animation: rotates the menu bar fan icon every frame.
+    private var fanTimer: Timer?
+    private let fanSpinner = FanSpinner.shared(for: "statusbar")
+
     init(daemon: FanDaemonClient, fanController: FanController, monitor: HardwareMonitor) {
         self.daemon = daemon
         self.fanController = fanController
@@ -33,6 +37,11 @@ final class StatusBarController: ObservableObject {
             .sink { [weak self] available in
                 guard let self else { return }
                 self.statusItem?.isVisible = available
+                if available {
+                    self.startFanAnimation()
+                } else {
+                    self.stopFanAnimation()
+                }
                 self.updateStatusTitle()
             }
             .store(in: &cancellables)
@@ -54,6 +63,34 @@ final class StatusBarController: ObservableObject {
             .store(in: &cancellables)
     }
 
+    deinit {
+        stopFanAnimation()
+    }
+
+    // MARK: - Fan animation
+
+    private func startFanAnimation() {
+        guard fanTimer == nil else { return }
+        let timer = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+            self?.updateStatusTitle()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        fanTimer = timer
+    }
+
+    private func stopFanAnimation() {
+        fanTimer?.invalidate()
+        fanTimer = nil
+    }
+
+    /// Fan speed percentage used for the icon animation and its color:
+    /// the highest percentage among all fans.
+    private var fanPercentage: Double {
+        monitor.fanPercentages.values.max() ?? 1
+    }
+
+    // MARK: - Status title
+
     private func updateStatusTitle() {
         guard let button = statusItem?.button else { return }
         guard daemon.isAvailable else {
@@ -74,16 +111,46 @@ final class StatusBarController: ObservableObject {
             ))
         }
 
-        // Fan icon + speed
+        // Animated fan icon (rotating, colored by speed) + speed
         let rpmValues = monitor.fanSpeeds.keys.sorted().compactMap { monitor.fanSpeeds[$0] }
         if !rpmValues.isEmpty {
             if attr.length > 0 { attr.append(NSAttributedString(string: "  ")) }
-            attr.append(NSAttributedString(attachment: attachment(symbol: "fanblades.fill", size: 13, color: nil)))
+            let percentage = fanPercentage
+            let angle = fanSpinner.advance(
+                to: TemperatureIndicator.spinSpeed(forPercentage: percentage),
+                at: Date()
+            )
+            let color = NSColor(TemperatureIndicator.speedColor(forPercentage: percentage))
+            attr.append(NSAttributedString(attachment: animatedFanAttachment(size: 13, angle: angle, color: color)))
             let rpmText = rpmValues.map { String(Int($0)) }.joined(separator: "/")
             attr.append(NSAttributedString(string: " \(rpmText)"))
         }
 
         button.attributedTitle = attr
+    }
+
+    /// Fan blade icon rotated by `angle` degrees and tinted with `color`.
+    private func animatedFanAttachment(size: CGFloat, angle: Double, color: NSColor) -> NSTextAttachment {
+        let symbol = NSImage(systemSymbolName: "fanblades.fill", accessibilityDescription: nil) ?? NSImage()
+        let config = NSImage.SymbolConfiguration(pointSize: size, weight: .regular)
+            .applying(.init(paletteColors: [color]))
+        let base = symbol.withSymbolConfiguration(config) ?? symbol
+
+        let imageSize = base.size
+        let rotated = NSImage(size: imageSize)
+        rotated.lockFocus()
+        if let context = NSGraphicsContext.current?.cgContext {
+            context.translateBy(x: imageSize.width / 2, y: imageSize.height / 2)
+            context.rotate(by: angle * .pi / 180)
+            context.translateBy(x: -imageSize.width / 2, y: -imageSize.height / 2)
+        }
+        base.draw(in: NSRect(origin: .zero, size: imageSize))
+        rotated.unlockFocus()
+
+        let attachment = NSTextAttachment()
+        attachment.image = rotated
+        attachment.bounds = CGRect(x: 0, y: -2, width: size, height: size)
+        return attachment
     }
 
     private func attachment(symbol: String, size: CGFloat, color: NSColor?) -> NSTextAttachment {
