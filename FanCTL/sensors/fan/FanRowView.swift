@@ -18,7 +18,7 @@ struct FanRowView: View {
     var body: some View {
         VStack(spacing: 8) {
             HStack {
-                SpinningFanIcon(percentage: fan.percentage)
+                SpinningFanIcon(id: String(fan.id), percentage: fan.percentage)
                     .foregroundColor(fan.statusColor)
                     .font(.system(size: 16))
 

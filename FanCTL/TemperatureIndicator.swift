@@ -26,17 +26,63 @@ enum TemperatureIndicator {
     }
 }
 
+/// Mutable state of the fan animation, kept across frames without triggering
+/// SwiftUI invalidations (TimelineView drives the frames by itself).
+private final class FanSpinner {
+    var angle: Double = 0
+    var lastDate: Date?
+    var currentRevsPerSec: Double = 1
+}
+
 /// Animated fan icon: spins at a speed proportional to the percentage.
+///
+/// The rotation angle is ACCUMULATED frame by frame (angle += speed × dt)
+/// instead of being derived from absolute time, so an update of the
+/// percentage changes only the rotation speed and never resets or jumps
+/// the icon.
+///
+/// The spinner state lives in a STATIC dictionary keyed by `id` (not in
+/// `@State`): a parent re-render can rebuild the view struct, and relying on
+/// `@State` would reset the accumulated angle on every refresh, breaking the
+/// animation. The dictionary survives rebuilds and guarantees continuity.
 struct SpinningFanIcon: View {
+    var id: String = "fan"
     var percentage: Double = 1
+
+    private static var spinners: [String: FanSpinner] = [:]
+
+    private var spinner: FanSpinner {
+        if Self.spinners[id] == nil {
+            Self.spinners[id] = FanSpinner()
+        }
+        return Self.spinners[id]!
+    }
 
     var body: some View {
         TimelineView(.animation) { context in
-            let revsPerSec = TemperatureIndicator.spinSpeed(forPercentage: percentage)
-            let degrees = (context.date.timeIntervalSinceReferenceDate * revsPerSec * 360)
-                .truncatingRemainder(dividingBy: 360)
-            Image(systemName: "fanblades.fill")
-                .rotationEffect(.degrees(degrees))
+            let now = context.date
+            let targetRevs = TemperatureIndicator.spinSpeed(forPercentage: percentage)
+            let state = spinner
+
+            if let last = state.lastDate {
+                // Clamp dt so a long pause (e.g. app in background) cannot
+                // produce a giant angle jump on the next frame.
+                let dt = max(0, min(now.timeIntervalSince(last), 0.1))
+                if dt > 0 {
+                    // Ease the angular speed toward the target. The constant is
+                    // gentle (≈0.5s time constant) so RPM changes coming from
+                    // periodic refreshes glide into each other instead of
+                    // snapping the rotation speed at each update.
+                    let ease = 1 - exp(-2 * dt)
+                    state.currentRevsPerSec += (targetRevs - state.currentRevsPerSec) * ease
+                    state.angle = (state.angle + dt * state.currentRevsPerSec * 360)
+                        .truncatingRemainder(dividingBy: 360)
+                }
+            }
+            state.lastDate = now
+
+            return Image(systemName: "fanblades.fill")
+                .rotationEffect(.degrees(state.angle))
         }
     }
 }
