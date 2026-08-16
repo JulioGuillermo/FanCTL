@@ -155,8 +155,30 @@ struct FanRowView: View {
             .foregroundColor(.secondary)
         }
         .padding(12)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14))
-        .shadow(color: .black.opacity(0.15), radius: 10, y: 4)
+        // Clear variant: nearly transparent so light passes through, but the
+        // refraction/distortion of the animated background is preserved. The
+        // dark tint gives the glass more body and the deep shadow lifts it
+        // away from the background, increasing the perceived thickness.
+        .glassEffect(.clear.tint(.black.opacity(0.50)), in: RoundedRectangle(cornerRadius: 14))
+        // Simulated edge thickness (the public API has no thickness/IOR
+        // control): a beveled rim catches the light on top and darkens at the
+        // bottom, like the ground edge of a thick glass pane.
+        .overlay {
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            .white.opacity(0.50),
+                            .white.opacity(0.15),
+                            .black.opacity(0.30)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 5
+                )
+        }
+        .shadow(color: .black.opacity(0.35), radius: 16, y: 8)
     }
 }
 
