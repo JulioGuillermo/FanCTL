@@ -63,6 +63,7 @@ public struct FanSettingsView: View {
                         effMax: effMax
                     )
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .padding(14)
                 .frame(width: 300)
             } detail: {
@@ -111,7 +112,7 @@ public struct FanSettingsView: View {
                                         setSelected($0, selected: $1)
                                     }
                                 )
-                                .frame(minHeight: 240, maxHeight: 320)
+                                .frame(minHeight: 240, maxHeight: .infinity)
                                 .clipped()
                             } else {
                                 Text("No sensors detected.")
@@ -119,9 +120,15 @@ public struct FanSettingsView: View {
                                     .foregroundColor(.secondary)
                             }
                         }
+                        .frame(
+                            maxWidth: .infinity,
+                            maxHeight: .infinity,
+                            alignment: .topLeading
+                        )
 
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .padding(10)
             }
         }
