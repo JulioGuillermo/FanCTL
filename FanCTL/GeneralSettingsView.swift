@@ -7,7 +7,7 @@ struct GeneralSettingsView: View {
     @ObservedObject var store: SettingsStore
     @ObservedObject var daemon: FanDaemonClient
     let sensors: [SensorInfo]
-    @Environment(\.dismiss) var dismiss
+    var onClose: () -> Void = {}
 
     @State private var sortMode: SensorSortMode = .alphabetical
 
@@ -27,7 +27,7 @@ struct GeneralSettingsView: View {
                     .font(.title2)
                     .bold()
                 Spacer()
-                Button("Close") { dismiss() }
+                Button("Close") { onClose() }
                     .buttonStyle(.glass)
             }
 

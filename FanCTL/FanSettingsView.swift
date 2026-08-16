@@ -6,15 +6,16 @@ struct FanSettingsView: View {
     let fan: FanInfo
     let sensors: [SensorInfo]
     @ObservedObject var store: SettingsStore
-    @Environment(\.dismiss) var dismiss
+    var onClose: () -> Void = {}
 
     @State private var config: FanSettings
     @State private var sortMode: SensorSortMode = .alphabetical
 
-    init(fan: FanInfo, sensors: [SensorInfo], store: SettingsStore) {
+    init(fan: FanInfo, sensors: [SensorInfo], store: SettingsStore, onClose: @escaping () -> Void = {}) {
         self.fan = fan
         self.sensors = sensors
         self.store = store
+        self.onClose = onClose
         _config = State(initialValue: store.fanSettings(for: fan))
     }
 
@@ -45,7 +46,7 @@ struct FanSettingsView: View {
                         .foregroundColor(.secondary)
                 }
                 Spacer()
-                Button("Close") { dismiss() }
+                Button("Close") { onClose() }
                     .buttonStyle(.glass)
             }
 

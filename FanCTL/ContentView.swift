@@ -13,12 +13,11 @@ struct ContentView: View {
     @State private var connectionStatus: String = "Not started"
     @State private var isConnected: Bool = false
     @State private var selectedSensor: SensorInfo? = nil
-    @State private var settingsFan: FanInfo? = nil
     @State private var isScanning: Bool = false
-    @State private var showingGeneralSettings: Bool = false
     @State private var lastRefresh: Date = .distantPast
 
     @StateObject private var settingsStore = SettingsStore()
+    @State private var panelManager = LiquidGlassPanelManager()
 
     // 0.5s ticker to respect the configured rescan interval
     private let ticker = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
@@ -56,9 +55,9 @@ struct ContentView: View {
                 onManualRPMChange: { fan, rpm in
                     changeManualRPM(rpm, for: fan)
                 },
-                onGeneralSettings: { showingGeneralSettings = true },
-                onFanSettings: { settingsFan = $0 },
-                onRequestControl: { requestControlPermissions() }
+                    onGeneralSettings: { presentGeneralSettings() },
+                    onFanSettings: { presentFanSettings($0) },
+                    onRequestControl: { requestControlPermissions() }
             )
                 .frame(minWidth: 480, maxWidth: .infinity)
             }
@@ -89,14 +88,6 @@ struct ContentView: View {
             SensorDetailView(sensor: sensor)
                 .presentationBackground(.ultraThinMaterial)
         }
-        .sheet(item: $settingsFan) { fan in
-            FanSettingsView(fan: fan, sensors: sensors, store: settingsStore)
-                .presentationBackground(.ultraThinMaterial)
-        }
-        .sheet(isPresented: $showingGeneralSettings) {
-            GeneralSettingsView(store: settingsStore, daemon: daemonClient, sensors: sensors)
-                .presentationBackground(.ultraThinMaterial)
-        }
         .onReceive(daemonClient.$isAvailable) { available in
             // If the daemon becomes available (or goes down), recompute control
             if available {
@@ -106,6 +97,32 @@ struct ContentView: View {
                 fanController.recheckPrivileges()
             }
         }
+    }
+
+    private func presentGeneralSettings() {
+        panelManager.present(
+            GeneralSettingsView(
+                store: settingsStore,
+                daemon: daemonClient,
+                sensors: sensors,
+                onClose: { panelManager.close() }
+            )
+            .liquidGlassPanel(),
+            relativeTo: NSApp.keyWindow
+        )
+    }
+
+    private func presentFanSettings(_ fan: FanInfo) {
+        panelManager.present(
+            FanSettingsView(
+                fan: fan,
+                sensors: sensors,
+                store: settingsStore,
+                onClose: { panelManager.close() }
+            )
+            .liquidGlassPanel(),
+            relativeTo: NSApp.keyWindow
+        )
     }
 
     private func mode(for fan: FanInfo) -> FanMode {
