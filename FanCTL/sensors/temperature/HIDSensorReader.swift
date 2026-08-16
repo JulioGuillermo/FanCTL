@@ -78,16 +78,17 @@ final class HIDSensorReader {
                     let temp = eventGetFloatValue(event, 15 << 16)
                     if temp > 0 && temp < 130 {
                         let category: SensorCategory
+                        let lower = rawName.lowercased()
 
-                        if rawName.contains("tdie") {
+                        if lower.contains("tdie") {
                             category = .socDie
-                        } else if rawName.contains("tdev") {
+                        } else if lower.contains("tdev") {
                             category = .pmuBoard
-                        } else if rawName.contains("tcal") {
+                        } else if lower.contains("tcal") {
                             category = .powerManagement
-                        } else if rawName.contains("nand") {
+                        } else if lower.contains("nand") {
                             category = .storage
-                        } else if rawName.contains("TB") || rawName.lowercased().contains("bat") {
+                        } else if lower.contains("tb") || lower.contains("bat") {
                             category = .battery
                         } else {
                             category = .unknown

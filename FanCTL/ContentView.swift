@@ -29,7 +29,7 @@ struct ContentView: View {
             LeftPanelSensorsView(
                 sensors: sensors,
                 selectedSensor: $selectedSensor,
-                maxTempSensorKey: settingsStore.settings.maxTempSensorKey
+                maxTempSensorKeys: settingsStore.settings.maxTempSensorKeys
             )
             .frame(minWidth: 330, maxWidth: 380)
 
@@ -182,7 +182,7 @@ struct ContentView: View {
         hardwareMonitor.update(
             sensors: snapshot.sensors,
             fans: snapshot.fans,
-            maxTempSensorKey: settingsStore.settings.maxTempSensorKey
+            maxTempSensorKeys: settingsStore.settings.maxTempSensorKeys
         )
         AppLog.log("[Content] Total sensors: \(snapshot.sensors.count), Fans: \(snapshot.fans.count), connectionOk: \(snapshot.connectionOk)")
 
@@ -195,13 +195,20 @@ struct ContentView: View {
 struct LeftPanelSensorsView: View {
     let sensors: [SensorInfo]
     @Binding var selectedSensor: SensorInfo?
-    var maxTempSensorKey: String? = nil
+    var maxTempSensorKeys: [String] = []
+
+    @State private var sortMode: SensorSortMode = .hottest
+
+    private var sortedSensorsList: [SensorInfo] {
+        sortedSensors(sensors, by: sortMode)
+    }
 
     private var maxTempSensor: SensorInfo? {
-        if let key = maxTempSensorKey {
-            return sensors.first { $0.id == key }
+        if maxTempSensorKeys.isEmpty {
+            return sensors.max { $0.value < $1.value }
         }
-        return sensors.max { $0.value < $1.value }
+        let pool = sensors.filter { maxTempSensorKeys.contains($0.id) }
+        return pool.max { $0.value < $1.value }
     }
 
     private var maxTempText: String {
@@ -221,19 +228,25 @@ struct LeftPanelSensorsView: View {
 
     private var maxTempSourceName: String {
         guard let sensor = maxTempSensor else { return "No data" }
-        return maxTempSensorKey == nil ? "Auto · \(sensor.rawKey)" : sensor.rawKey
+        return maxTempSensorKeys.isEmpty ? "Auto · \(sensor.rawKey)" : sensor.rawKey
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             // Sensor section header
             VStack(alignment: .leading, spacing: 2) {
-                Text("Thermal sensors")
-                    .font(.title3)
-                    .bold()
-                Text("Direct IOKit access")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Thermal sensors")
+                            .font(.title3)
+                            .bold()
+                        Text("Direct IOKit access")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    SensorSortMenu(sortMode: $sortMode)
+                }
             }
             .padding(.horizontal)
             .padding(.top)
@@ -263,7 +276,7 @@ struct LeftPanelSensorsView: View {
 
             // Clean thermal sensor list
             if !sensors.isEmpty {
-                List(sensors, id: \.id) { sensor in
+                List(sortedSensorsList, id: \.id) { sensor in
                     SensorRowView(
                         sensor: sensor,
                         onTapDetails: { selectedSensor = sensor }

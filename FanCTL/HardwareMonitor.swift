@@ -8,12 +8,9 @@ final class HardwareMonitor: ObservableObject {
     @Published private(set) var fanSpeeds: [Int: Double] = [:]
     @Published private(set) var fanCount = 0
 
-    func update(sensors: [SensorInfo], fans: [FanInfo], maxTempSensorKey: String?) {
-        if let key = maxTempSensorKey, let chosen = sensors.first(where: { $0.id == key }) {
-            maxTemperature = chosen.value
-        } else {
-            maxTemperature = sensors.map(\.value).max()
-        }
+    func update(sensors: [SensorInfo], fans: [FanInfo], maxTempSensorKeys: [String]) {
+        let pool = maxTempSensorKeys.isEmpty ? sensors : sensors.filter { maxTempSensorKeys.contains($0.id) }
+        maxTemperature = pool.map(\.value).max()
         fanSpeeds = Dictionary(uniqueKeysWithValues: fans.map { ($0.id, $0.currentRPM) })
         fanCount = fans.count
     }

@@ -9,6 +9,7 @@ struct FanSettingsView: View {
     @Environment(\.dismiss) var dismiss
 
     @State private var config: FanSettings
+    @State private var sortMode: SensorSortMode = .alphabetical
 
     init(fan: FanInfo, sensors: [SensorInfo], store: SettingsStore) {
         self.fan = fan
@@ -119,14 +120,15 @@ struct FanSettingsView: View {
                         Text("Sensors controlling this fan")
                             .font(.headline)
                         Spacer()
+                        SensorSortMenu(sortMode: $sortMode)
                         Button("All") { selectAll() }
                         Button("None") { config.selectedSensorKeys = [] }
                     }
                     .font(.caption)
 
                     if !sensors.isEmpty {
-                        List(sensors, id: \.id) { sensor in
-                            SensorSelectionRow(
+                        List(sortedSensors(sensors, by: sortMode), id: \.id) { sensor in
+                            SensorCheckRow(
                                 sensor: sensor,
                                 isSelected: config.selectedSensorKeys.contains(sensor.id),
                                 onToggle: { toggle(sensor) }
@@ -325,40 +327,5 @@ struct FanSettingsView: View {
 
     private func selectAll() {
         config.selectedSensorKeys = sensors.map(\.id)
-    }
-}
-
-/// Row with checkbox for sensor selection inside a fan's config.
-private struct SensorSelectionRow: View {
-    let sensor: SensorInfo
-    let isSelected: Bool
-    let onToggle: () -> Void
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Button(action: onToggle) {
-                Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-                    .font(.title3)
-                    .foregroundColor(isSelected ? .blue : .secondary)
-            }
-            .buttonStyle(.plain)
-
-            Text(sensor.rawKey)
-                .font(.system(.body, design: .monospaced))
-                .bold()
-                .strikethrough(!isSelected, color: .secondary)
-
-            Text(SensorDescriptions.shortName(for: sensor.rawKey))
-                .font(.caption2)
-                .foregroundColor(.secondary)
-
-            Spacer()
-
-            Text(String(format: "%.1f °C", sensor.value))
-                .font(.system(.body, design: .monospaced))
-                .foregroundColor(.secondary)
-        }
-        .help(sensor.descriptionText)
-        .padding(.vertical, 2)
     }
 }

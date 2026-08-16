@@ -9,6 +9,8 @@ struct GeneralSettingsView: View {
     let sensors: [SensorInfo]
     @Environment(\.dismiss) var dismiss
 
+    @State private var sortMode: SensorSortMode = .alphabetical
+
     private let intervalOptions: [Double] = [0.5, 1, 2, 3, 5, 10, 15, 30, 60]
 
     var body: some View {
@@ -52,21 +54,49 @@ struct GeneralSettingsView: View {
                 Text("Max temperature indicator")
                     .font(.headline)
 
-                Text("Choose which sensor feeds the max temperature shown at the top and in the menu bar.")
+                Text("Choose which sensors feed the max temperature shown at the top and in the menu bar. If none are selected, the hottest sensor is used.")
                     .font(.caption)
                     .foregroundColor(.secondary)
 
-                Picker("Source sensor", selection: Binding(
-                    get: { store.settings.maxTempSensorKey ?? "" },
-                    set: { store.setMaxTempSensorKey($0.isEmpty ? nil : $0) }
-                )) {
-                    Text("Automatic (hottest sensor)").tag("")
-                    ForEach(sensors, id: \.id) { sensor in
-                        Text(sensor.rawKey).tag(sensor.id)
+                HStack {
+                    Button(action: { store.setMaxTempSensorKeys([]) }) {
+                        HStack(spacing: 10) {
+                            Image(systemName: store.settings.maxTempSensorKeys.isEmpty ? "checkmark.square.fill" : "square")
+                                .font(.title3)
+                                .foregroundColor(store.settings.maxTempSensorKeys.isEmpty ? .blue : .secondary)
+                            Image(systemName: "sparkles")
+                                .font(.body)
+                                .foregroundColor(.blue)
+                                .frame(width: 22)
+                            Text("Automatic (hottest sensor)")
+                                .font(.system(.body))
+                                .bold()
+                                .strikethrough(!store.settings.maxTempSensorKeys.isEmpty, color: .secondary)
+                        }
                     }
+                    .buttonStyle(.plain)
+                    .help("Use the hottest sensor automatically.")
+
+                    Spacer()
+                    SensorSortMenu(sortMode: $sortMode)
                 }
-                .pickerStyle(.menu)
-                .disabled(sensors.isEmpty)
+
+                if !sensors.isEmpty {
+                    List(sortedSensors(sensors, by: sortMode), id: \.id) { sensor in
+                        SensorCheckRow(
+                            sensor: sensor,
+                            isSelected: store.settings.maxTempSensorKeys.contains(sensor.id),
+                            onToggle: { toggleMaxTempSensor(sensor) }
+                        )
+                    }
+                    .listStyle(.plain)
+                    .frame(minHeight: 200, maxHeight: 300)
+                    .clipped()
+                } else {
+                    Text("No sensors detected.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
 
             Divider()
@@ -193,6 +223,16 @@ struct GeneralSettingsView: View {
         if daemon.isAvailable { return "Stop" }
         if daemon.daemonStatus == .enabled { return "Start" }
         return "Install and start"
+    }
+
+    private func toggleMaxTempSensor(_ sensor: SensorInfo) {
+        var keys = store.settings.maxTempSensorKeys
+        if let index = keys.firstIndex(of: sensor.id) {
+            keys.remove(at: index)
+        } else {
+            keys.append(sensor.id)
+        }
+        store.setMaxTempSensorKeys(keys)
     }
 
     private func uninstallDaemon() {
