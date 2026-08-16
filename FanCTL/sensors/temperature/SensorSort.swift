@@ -101,6 +101,8 @@ struct SensorCheckRow: View {
                 .font(.system(.body, design: .monospaced))
                 .foregroundColor(.secondary)
         }
+        .contentShape(Rectangle())
+        .onTapGesture { onToggle() }
         .help(sensor.descriptionText)
         .padding(.vertical, 2)
     }
