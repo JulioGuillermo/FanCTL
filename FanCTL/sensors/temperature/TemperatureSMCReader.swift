@@ -7,8 +7,7 @@ import Foundation
 /// every responding key (`smc list` style) and contains the keys that actually
 /// return data on this machine:
 ///
-/// - `Tp*`: CPU performance cores (P-cores)
-/// - `Te*`: CPU efficiency cores (E-cores)
+/// - `Tp*`, `Te*`: thermal zones on the CPU silicon (NOT individual cores)
 /// - `Tg*`: GPU clusters
 /// - `Tm*`: unified memory (RAM)
 /// - `Ts*`, `Ta*`, `Tz*`, `TfC*`: generic SoC / ambient thermal sensors
@@ -21,16 +20,24 @@ import Foundation
 ///
 /// # Min/current/max triples
 ///
-/// The silicon temperature families (`Tp`, `Te`, `Tg`) expose each core block
-/// as a *group* of registers: the three keys of a triple are the MINIMUM,
-/// CURRENT and MAXIMUM temperature of the same block (GPU blocks are exposed
-/// as current/max pairs). Stats only shows the "current" register of each
-/// block, which is why its values (~40-50 °C) are lower than the raw max
+/// The silicon temperature families (`Tp`, `Te`, `Tg`) expose each thermal
+/// zone as a *group* of registers: the three keys of a triple are the
+/// MINIMUM, CURRENT and MAXIMUM temperature of the same zone (GPU zones are
+/// exposed as current/max pairs). Stats only shows the "current" register of
+/// each zone, which is why its values (~40-50 °C) are lower than the raw max
 /// registers (~56-73 °C).
 ///
 /// This reader collapses each group into a single sensor reporting the current
 /// value: the MEDIAN of a triple, or the MINIMUM of a pair (verified against a
 /// full key dump on this machine).
+///
+/// # Thermal zones vs. cores
+///
+/// These `Tp`/`Te` sensors are silicon thermal zones, NOT individual CPU
+/// cores: a machine with 4 P-cores exposes many more `Tp*` zones, and Apple
+/// changes which key maps to which block with every SoC generation. The
+/// names are therefore generic ("CPU silicon zone") instead of claiming a
+/// specific core count.
 final class TemperatureSMCReader {
     private let client: SMCClient
 
@@ -113,7 +120,7 @@ final class TemperatureSMCReader {
                     thermalZone: "AppleSMC Subsystem",
                     usagePage: nil,
                     usage: nil,
-                    descriptionText: "Current temperature of \(name), exposed by the AppleSMC register key \(currentKey). Each core block is reported by the SMC as a group of min/current/max registers; this sensor shows the current reading, matching the value Stats shows.",
+                    descriptionText: "Thermal zone on the CPU silicon die, exposed by the AppleSMC register key \(currentKey). The SMC reports each block as min/current/max registers and this sensor shows the current reading. Note: these are silicon thermal zones, not individual cores — the mapping to P-core/E-core varies with each SoC generation.",
                     unit: cluster.unit
                 ))
             }
@@ -157,7 +164,7 @@ final class TemperatureSMCReader {
         case .memory:
             return "Unified memory (RAM) temperature exposed by the AppleSMC register key (\(key)). Rises with memory-heavy workloads."
         case .socDie:
-            return "SoC die temperature exposed by the AppleSMC register key (\(key)). Thermal sensor of a CPU core block (P-core/E-core) or SoC zone."
+            return "Thermal zone on the CPU silicon die, exposed by the AppleSMC register key (\(key)). It measures a silicon block (P-core cluster, E-core cluster or SoC zone) but is NOT a single core."
         case .powerManagement:
             return "Power delivery thermal sensor exposed by the AppleSMC register key (\(key)). Measures regulators or power delivery components."
         case .power:
@@ -175,21 +182,26 @@ final class TemperatureSMCReader {
 
     /// Core-block clusters. Each group is min/current/max (3 keys) or
     /// current/max (2 keys); the reader collapses it to the current value.
+    ///
+    /// These are silicon THERMAL ZONES, not individual CPU cores: Apple
+    /// changes the key layout with every SoC generation and the exact
+    /// mapping to P/E cores is undocumented (Stats' author confirmed it).
+    /// The names are intentionally generic to avoid claiming a false count.
     private static func buildClusters() -> [ClusterSpec] {
         [
-            // CPU performance cores (P-cores): 11 triples + 3 pairs
+            // CPU silicon zones: 11 triples + 3 pairs
             ClusterSpec(prefix: "Tp", groups: [
                 ["00","01","02"], ["04","05","06"], ["08","09","0A"], ["0C","0D","0E"],
                 ["0U","0V","0W"], ["0X","0Y","0Z"], ["0a","0b","0c"], ["0d","0e","0f"],
                 ["1A","1B","1C"], ["1E","1F","1G"], ["1Q","1R","1S"],
                 ["3O","3P"], ["3S","3T"], ["3W","3X"]
-            ], name: "CPU P-core", category: .socDie),
+            ], name: "CPU silicon zone", category: .socDie),
 
-            // CPU efficiency cores (E-cores): 4 triples + 2 pairs
+            // CPU silicon zones (efficiency cluster): 4 triples + 2 pairs
             ClusterSpec(prefix: "Te", groups: [
                 ["04","05","06"], ["08","09","0A"], ["0G","0H","0I"], ["0R","0S","0T"],
                 ["0U","0V"], ["0W","0X"]
-            ], name: "CPU E-core", category: .socDie),
+            ], name: "CPU silicon zone", category: .socDie),
 
             // GPU clusters: 9 current/max pairs
             ClusterSpec(prefix: "Tg", groups: [

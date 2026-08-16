@@ -70,11 +70,8 @@ enum SensorDescriptions {
         if key.contains("nand") {
             return "SSD (NAND)"
         }
-        if key.hasPrefix("tp") {
-            return "CPU P-core"
-        }
-        if key.hasPrefix("te") {
-            return "CPU E-core"
+        if key.hasPrefix("tp") || key.hasPrefix("te") {
+            return "CPU silicon"
         }
         if key.hasPrefix("tg") {
             return "GPU"
