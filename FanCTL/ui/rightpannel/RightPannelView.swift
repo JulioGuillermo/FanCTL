@@ -35,101 +35,28 @@ struct RightPanelFansView: View {
             )
 
             Divider()
-            
-            if !controlActive {
-                HStack(spacing: 10) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.orange)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Fan control disabled")
-                            .font(.caption)
-                            .bold()
-                        Text(
-                            "Background control requires administrator privileges."
-                        )
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                    }
-                    Spacer()
-                    Button("Start control") { onRequestControl() }
-                        .buttonStyle(.glassProminent)
-                        .controlSize(.small)
-                        .disabled(isRequestingPermissions)
-                }
-                .padding(10)
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 10))
-                .padding(.horizontal)
-                .padding(.top, 4)
 
-                if let controlError {
-                    Text(controlError)
-                        .font(.caption2)
-                        .foregroundColor(.orange)
-                        .padding(.horizontal)
-                }
+            RootBanner(
+                controlActive: controlActive,
+                isRequestingPermissions: isRequestingPermissions,
+                onRequestControl: onRequestControl,
+                controlError: controlError
+            )
 
-                if isRequestingPermissions {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text("Requesting administrator privileges…")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.horizontal)
-                }
-            }
-
-            // Fan list (takes all available space)
-            if !fans.isEmpty {
-                ScrollView {
-                    // Group the glass cards so they blend as a single material
-                    GlassEffectContainer(spacing: 12) {
-                        VStack(spacing: 12) {
-                            ForEach(fans) { fan in
-                                FanRowView(
-                                    fan: fan,
-                                    mode: modeFor(fan),
-                                    desiredRPM: desiredRPMFor(fan),
-                                    manualRPM: manualRPMFor(fan),
-                                    minSpeedRPM: minSpeedRPMFor(fan),
-                                    maxSpeedRPM: maxSpeedRPMFor(fan),
-                                    controlActive: controlActive,
-                                    isRequestingPermissions:
-                                        isRequestingPermissions,
-                                    onChangeMode: { onChangeMode(fan, $0) },
-                                    onManualRPMChange: {
-                                        onManualRPMChange(fan, $0)
-                                    },
-                                    onRequestControl: onRequestControl,
-                                    onSettings: { onFanSettings(fan) }
-                                )
-                            }
-                        }
-                    }
-                    .padding(.horizontal)
-                }
-            } else {
-                // State for fanless Macs (e.g. MacBook Air)
-                VStack(spacing: 12) {
-                    Spacer()
-                    Image(systemName: "wind")
-                        .font(.system(size: 36))
-                        .foregroundColor(.secondary.opacity(0.6))
-                    Text("No fans")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                    Text(
-                        "This machine uses passive cooling or does not report fans."
-                    )
-                    .font(.caption)
-                    .multilineTextAlignment(.center)
-                    .foregroundColor(.secondary.opacity(0.8))
-                    .padding(.horizontal)
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
+            FanList(
+                fans: fans,
+                controlActive: controlActive,
+                isRequestingPermissions: isRequestingPermissions,
+                modeFor: modeFor,
+                desiredRPMFor: desiredRPMFor,
+                manualRPMFor: manualRPMFor,
+                minSpeedRPMFor: minSpeedRPMFor,
+                maxSpeedRPMFor: maxSpeedRPMFor,
+                onChangeMode: onChangeMode,
+                onManualRPMChange: onManualRPMChange,
+                onFanSettings: onFanSettings,
+                onRequestControl: onRequestControl
+            )
 
             Spacer()
         }

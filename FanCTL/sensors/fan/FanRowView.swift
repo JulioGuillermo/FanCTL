@@ -154,7 +154,7 @@ struct FanRowView: View {
         // refraction/distortion of the animated background is preserved. The
         // dark tint gives the glass more body and the deep shadow lifts it
         // away from the background, increasing the perceived thickness.
-        .glassEffect(.clear.tint(.black.opacity(0.50)), in: RoundedRectangle(cornerRadius: 14))
+        .glassEffect(.clear.tint(.black.opacity(0.60)), in: RoundedRectangle(cornerRadius: 14))
         // Simulated edge thickness (the public API has no thickness/IOR
         // control): a beveled rim catches the light on top and darkens at the
         // bottom, like the ground edge of a thick glass pane.
