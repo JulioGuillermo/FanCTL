@@ -60,27 +60,7 @@ public struct FanListItem: View {
                 }
             }
 
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.secondary.opacity(0.15))
-                        .frame(height: 8)
-
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.blue, fan.statusColor],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(
-                            width: geo.size.width * CGFloat(fan.percentage),
-                            height: 8
-                        )
-                }
-            }
-            .frame(height: 8)
+            FanPercentageIndicator(percentage: fan.percentage)
 
             // Speed being applied according to the mode
             if let desired = desiredRPM {
@@ -129,7 +109,7 @@ public struct FanListItem: View {
 
                 Text(fan.percentageString)
                     .bold()
-                    .foregroundColor(fan.statusColor)
+                    .foregroundColor(TemperatureIndicator.fluidColorB(forPercentage: fan.percentage))
             }
             .font(.caption2)
             .foregroundColor(.secondary)

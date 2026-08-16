@@ -14,14 +14,18 @@ public struct FanMainInfo: View {
     public var body: some View {
         HStack {
             FanName(fan: fan)
-            
+
             Spacer()
 
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text("\(Int(fan.currentRPM))")
                     .font(.system(.title3, design: .monospaced))
                     .bold()
-                    .foregroundColor(fan.statusColor)
+                    .foregroundColor(
+                        TemperatureIndicator.fluidColorB(
+                            forPercentage: fan.percentage
+                        )
+                    )
 
                 Text("RPM")
                     .font(.caption2)
