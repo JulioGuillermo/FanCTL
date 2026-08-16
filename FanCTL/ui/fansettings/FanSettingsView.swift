@@ -72,9 +72,17 @@ public struct FanSettingsView: View {
                     Divider()
 
                     if config.mode == .manual {
-                        manualSpeedSection
-                            .padding(.top, 4)
+                        FanSettingManualSpeedSection(
+                            fan: fan,
+                            effMin: effMin,
+                            effMax: effMax,
+                            config: $config
+                        )
                     } else if config.mode == .automatic {
+                        FanSettingSmoothing(config: $config)
+                        
+                        Divider()
+
                         // Sensors that control this fan
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
@@ -112,53 +120,9 @@ public struct FanSettingsView: View {
                             }
                         }
 
-                        Divider()
-
-                        // Speed smoothing: blend the calculated speed with the previous one
-                        VStack(alignment: .leading, spacing: 8) {
-                            Toggle(
-                                "Speed smoothing",
-                                isOn: $config.filterEnabled
-                            )
-                            .font(.headline)
-
-                            if config.filterEnabled {
-                                HStack(spacing: 10) {
-                                    Text("Fixed")
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                    Slider(
-                                        value: $config.filterFactor,
-                                        in: 0...1,
-                                        step: 0.05
-                                    )
-                                    Text("Unfiltered")
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                }
-
-                                Text(
-                                    String(
-                                        format:
-                                            "Speed = previous × %.0f%% + calculated × %.0f%%",
-                                        (1 - config.filterFactor) * 100,
-                                        config.filterFactor * 100
-                                    )
-                                )
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-
-                                if config.filterFactor < 0.01 {
-                                    Text(
-                                        "Fixed: the fan stays at its current speed."
-                                    )
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                }
-                            }
-                        }
                     }
                 }
+                .padding(10)
             }
         }
         .frame(
@@ -187,42 +151,6 @@ public struct FanSettingsView: View {
         }
         .onChange(of: config) { oldValue, newValue in
             store.updateFanSettings(newValue)
-        }
-    }
-
-    private var manualSpeedSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("Fixed speed")
-                    .foregroundColor(.secondary)
-                Spacer()
-                TextField(
-                    "RPM",
-                    value: Binding(
-                        get: { config.manualRPM },
-                        set: { config.manualRPM = min(max($0, effMin), effMax) }
-                    ),
-                    format: .number
-                )
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 80)
-                .multilineTextAlignment(.trailing)
-            }
-
-            Slider(
-                value: Binding(
-                    get: { config.manualRPM },
-                    set: { config.manualRPM = $0 }
-                ),
-                in: effMin...max(effMax, effMin),
-                step: 50
-            )
-
-            Text(
-                "Range: \(Int(effMin)) – \(Int(effMax)) RPM (fan's real range: \(Int(fan.minRPM)) – \(Int(fan.maxRPM)))"
-            )
-            .font(.caption2)
-            .foregroundColor(.secondary)
         }
     }
 
