@@ -39,6 +39,15 @@ jobs:
           xcodebuild -version
           xcode-select -p
 
+      # The runner may ship several Xcode versions (old and new). Use the
+      # NEWEST one so the app is built with the same SDK/renderer as the
+      # local toolchain (Xcode 26.6) and the UI looks identical.
+      - name: Select newest Xcode
+        run: |
+          ls -d /Applications/Xcode*.app 2>/dev/null
+          sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
+          xcodebuild -version
+
       # Build Release with the same ad-hoc signing used locally. Manual
       # signing with identity "-" guarantees the build succeeds on a runner
       # that has no Apple Developer team configured.
