@@ -61,6 +61,9 @@ struct SensorSortMenu: View {
             }
         }
         .pickerStyle(.menu)
+        .buttonStyle(.glass)
+        .controlSize(.small)
+        .tint(.blue)
         .fixedSize()
         .help("Sort order")
     }

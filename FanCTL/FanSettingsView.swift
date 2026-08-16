@@ -63,6 +63,7 @@ struct FanSettingsView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+                .tint(.blue)
                 .labelsHidden()
 
                 switch config.mode {

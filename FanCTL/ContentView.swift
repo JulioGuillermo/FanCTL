@@ -431,11 +431,9 @@ struct RightPanelFansView: View {
                 }
             }
             .padding(.horizontal)
-            .padding(.top)
+            .padding(.top, 8)
 
             Divider()
-
-            // Permission banner: asks to enable fan control
             if !controlActive {
                 HStack(spacing: 10) {
                     Image(systemName: "exclamationmark.triangle.fill")

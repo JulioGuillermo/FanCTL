@@ -59,6 +59,7 @@ struct FanRowView: View {
                 }
             }
             .pickerStyle(.segmented)
+            .tint(.blue)
             .labelsHidden()
 
             // Manual speed slider
@@ -155,25 +156,7 @@ struct FanRowView: View {
         }
         .padding(12)
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14))
-        // Specular edge: sharp top highlight + thin glass rim
-        .overlay {
-            RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(.white.opacity(0.28), lineWidth: 1)
-        }
-        .overlay(alignment: .top) {
-            RoundedRectangle(cornerRadius: 14)
-                .fill(
-                    LinearGradient(
-                        colors: [.white.opacity(0.35), .white.opacity(0.0)],
-                        startPoint: .top,
-                        endPoint: .center
-                    )
-                )
-                .frame(height: 30)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .allowsHitTesting(false)
-        }
-        .shadow(color: .black.opacity(0.20), radius: 10, y: 4)
+        .shadow(color: .black.opacity(0.15), radius: 10, y: 4)
     }
 }
 
