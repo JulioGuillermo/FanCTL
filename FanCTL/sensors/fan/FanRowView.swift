@@ -44,7 +44,7 @@ struct FanRowView: View {
                         .font(.title3)
                         .foregroundColor(.secondary)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.glass)
                 .help("Settings for \(fan.name)")
             }
 
@@ -123,7 +123,7 @@ struct FanRowView: View {
                             .font(.caption2)
                         } else {
                             Button("Start control") { onRequestControl() }
-                                .buttonStyle(.bordered)
+                                .buttonStyle(.glass)
                                 .controlSize(.small)
                         }
                     }
@@ -154,8 +154,7 @@ struct FanRowView: View {
             .foregroundColor(.secondary)
         }
         .padding(12)
-        .background(Color.secondary.opacity(0.08))
-        .cornerRadius(12)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14))
     }
 }
 

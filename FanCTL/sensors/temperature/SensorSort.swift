@@ -213,6 +213,7 @@ private struct GroupHeaderView: View {
         .contentShape(Rectangle())
         .onTapGesture { onToggleExpansion() }
         .padding(.vertical, 2)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6))
     }
 }
 

@@ -332,7 +332,7 @@ struct LeftPanelSensorsView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .background(Color.secondary.opacity(0.04))
+        .background(.ultraThinMaterial)
     }
 }
 
@@ -382,7 +382,7 @@ struct RightPanelFansView: View {
                             .font(.title3)
                             .foregroundColor(.secondary)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.glass)
                     .help("General settings")
                 }
 
@@ -438,13 +438,12 @@ struct RightPanelFansView: View {
                     }
                     Spacer()
                     Button("Start control") { onRequestControl() }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.glassProminent)
                         .controlSize(.small)
                         .disabled(isRequestingPermissions)
                 }
                 .padding(10)
-                .background(Color.orange.opacity(0.12))
-                .cornerRadius(8)
+                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 10))
                 .padding(.horizontal)
                 .padding(.top, 4)
 
@@ -512,7 +511,7 @@ struct RightPanelFansView: View {
 
             Spacer()
         }
-        .background(Color.secondary.opacity(0.04))
+        .background(.ultraThinMaterial)
     }
 }
 

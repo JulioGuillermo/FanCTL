@@ -28,6 +28,7 @@ struct GeneralSettingsView: View {
                     .bold()
                 Spacer()
                 Button("Close") { dismiss() }
+                    .buttonStyle(.glass)
             }
 
             Divider()
@@ -163,7 +164,7 @@ struct GeneralSettingsView: View {
                             .frame(maxWidth: .infinity)
                     }
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.glassProminent)
                 .tint(daemon.isAvailable ? .red : .blue)
                 .disabled(daemon.isRequestingPermissions)
 

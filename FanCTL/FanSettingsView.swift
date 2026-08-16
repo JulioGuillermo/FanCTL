@@ -46,6 +46,7 @@ struct FanSettingsView: View {
                 }
                 Spacer()
                 Button("Close") { dismiss() }
+                    .buttonStyle(.glass)
             }
 
             Divider()
@@ -277,8 +278,7 @@ struct FanSettingsView: View {
             }
         }
         .padding(10)
-        .background(Color.secondary.opacity(0.08))
-        .cornerRadius(8)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 10))
     }
 
     private var summaryTargetRPM: Double? {
