@@ -109,14 +109,30 @@ public struct FanListItem: View {
 
                 Text(fan.percentageString)
                     .bold()
-                    .foregroundColor(TemperatureIndicator.fluidColorB(forPercentage: fan.percentage))
+                    .foregroundColor(
+                        TemperatureIndicator.fluidColorB(
+                            forPercentage: fan.percentage
+                        )
+                    )
             }
             .font(.caption2)
             .foregroundColor(.secondary)
         }
         .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(
+                    Color(
+                        red: 0,
+                        green: 0.03,
+                        blue: 0.2,
+                    ).opacity(0.6)
+                )
+        )
         .glassEffect(
-            .clear.tint(.black.opacity(0.60)),
+            //            .clear.tint(.black.opacity(0.60)).interactive(),
+            .clear,
+            //            .regular,
             in: RoundedRectangle(cornerRadius: 14)
         )
         .overlay {
@@ -134,7 +150,6 @@ public struct FanListItem: View {
                     lineWidth: 5
                 )
         }
-        .shadow(color: .black.opacity(0.35), radius: 16, y: 8)
     }
 }
 
