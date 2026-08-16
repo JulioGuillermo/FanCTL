@@ -43,38 +43,42 @@ final class SMCClient {
     /// Reads the raw data of an SMC key (e.g. "FNum", "Tp01").
     /// - Parameter key: 4-character key name.
     /// - Returns: raw key data, or `nil` if the key does not exist or reading fails.
+    ///
+    /// AppleSMC reads can fail transiently for a single key on an otherwise
+    /// healthy machine. A quick retry drops the failure rate substantially,
+    /// which keeps the sensor list stable between scans.
     func readKeyData(_ key: String) -> SMCDatum? {
         let keyCode = FourCharCode.fromString(key)
 
-        var inputInfo = SMCParamStruct()
-        var outputInfo = SMCParamStruct()
+        for _ in 0..<2 {
+            var inputInfo = SMCParamStruct()
+            var outputInfo = SMCParamStruct()
 
-        inputInfo.key = keyCode
-        inputInfo.data8 = SMCConstants.commandGetKeyInfo
+            inputInfo.key = keyCode
+            inputInfo.data8 = SMCConstants.commandGetKeyInfo
 
-        guard callStruct(input: &inputInfo, output: &outputInfo) else {
-            return nil
+            guard callStruct(input: &inputInfo, output: &outputInfo) else { continue }
+
+            let dataSize = outputInfo.keyInfo.dataSize
+            guard dataSize > 0 else { return nil }
+
+            let dataType = FourCharCode.toString(outputInfo.keyInfo.dataType)
+
+            var inputRead = SMCParamStruct()
+            var outputRead = SMCParamStruct()
+
+            inputRead.key = keyCode
+            inputRead.keyInfo.dataSize = dataSize
+            inputRead.data8 = SMCConstants.commandReadBytes
+
+            guard callStruct(input: &inputRead, output: &outputRead) else { continue }
+
+            let bytes = withUnsafeBytes(of: outputRead.bytes) {
+                Array($0.prefix(Int(dataSize)))
+            }
+            return SMCDatum(bytes: bytes, type: dataType, size: dataSize)
         }
-
-        let dataSize = outputInfo.keyInfo.dataSize
-        let dataType = FourCharCode.toString(outputInfo.keyInfo.dataType)
-        guard dataSize > 0 else { return nil }
-
-        var inputRead = SMCParamStruct()
-        var outputRead = SMCParamStruct()
-
-        inputRead.key = keyCode
-        inputRead.keyInfo.dataSize = dataSize
-        inputRead.data8 = SMCConstants.commandReadBytes
-
-        guard callStruct(input: &inputRead, output: &outputRead) else {
-            return nil
-        }
-
-        let bytes = withUnsafeBytes(of: outputRead.bytes) {
-            Array($0.prefix(Int(dataSize)))
-        }
-        return SMCDatum(bytes: bytes, type: dataType, size: dataSize)
+        return nil
     }
 
     /// Writes raw data to an SMC key (e.g. "F0Md", "F0Mn").

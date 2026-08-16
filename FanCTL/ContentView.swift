@@ -175,13 +175,26 @@ struct ContentView: View {
         }
     }
 
+    /// Keeps the sensor list stable between scans. A sensor that fails to read
+    /// on a single scan (transient AppleSMC hiccup, core parked) stays in the
+    /// list with its last known value instead of disappearing and making the
+    /// list/scroll position jump.
+    private static func stabilizedSensors(_ newSensors: [SensorInfo],
+                                          against previous: [SensorInfo]) -> [SensorInfo] {
+        var byID = Dictionary(uniqueKeysWithValues: newSensors.map { ($0.id, $0) })
+        for stale in previous where byID[stale.id] == nil {
+            byID[stale.id] = stale
+        }
+        return Array(byID.values)
+    }
+
     private func refreshSensors() {
         lastRefresh = Date()
         isScanning = true
         AppLog.log("[Content] refreshSensors() started")
 
         let snapshot = SensorsReader().readAll()
-        self.sensors = snapshot.sensors
+        self.sensors = Self.stabilizedSensors(snapshot.sensors, against: sensors)
         self.fans = snapshot.fans
         self.isConnected = snapshot.connectionOk
         self.connectionStatus = snapshot.connectionOk ? "Connected" : "Connection error"
