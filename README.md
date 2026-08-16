@@ -23,14 +23,14 @@ FanCTL is a menu bar app that reads the system's thermal sensors through SMC and
 ## Where it's tested
 
 - **Hardware**: Mac mini with **M4 (base)** chip.
-- **macOS**: tested on recent macOS versions (Sonoma / Sequoia and later).
+- **macOS**: tested on macOS **Tahoe 26.6.1 (25G76)**.
 - **Architecture**: Apple Silicon (ARM64). Not compatible with Intel Macs.
 
 > On Apple Silicon the `Tp…`/`Te…` prefixes do not represent individual cores but **silicon thermal zones**, and their mapping varies by chip (M1–M5 and variants). FanCTL groups and labels them generically so it never assumes an incorrect mapping.
 
 ## Requirements
 
-- Mac with Apple Silicon and macOS 14 or later.
+- Mac with Apple Silicon and macOS 14 or later (only tested on the M4 chip and macOS Tahoe 26.6.1).
 - Fan control requires a **privileged daemon** that performs the SMC writes on your behalf (macOS blocks direct writes to the fan keys).
 
 ## Installation
