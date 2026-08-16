@@ -42,14 +42,20 @@ public struct SmokeParticles: View {
                     // Per-particle variation so the spirals never line up into one
                     // visible swirl: each one turns a different amount, at a
                     // different tightness, with a different wobble.
-                    let turnsIn = (0.6 + 1.2 * frac(seed * 9.1)) * 2.0 * .pi
-                    let turnsOut = (0.7 + 1.4 * frac(seed * 11.3)) * 2.0 * .pi
+                    let turnsIn = (0.36 + 0.72 * frac(seed * 9.1)) * 2.0 * .pi
+                    let turnsOut = (0.42 + 0.84 * frac(seed * 11.3)) * 2.0 * .pi
                     // Always > 1 so the radial speed eases to zero at the central
                     // boundary: the turnaround is a smooth valley, never a bounce.
                     let expB = 1.1 + 0.9 * frac(seed * 5.7)
+                    // Outward leg: bigger exponent = slow start near the fan and
+                    // accelerating drift towards the edges.
+                    let expOut = 1.3 + 1.0 * frac(seed * 5.7)
                     let wobble = sin(time * (0.4 + 1.2 * frac(seed * 6.1)) + seed * 40.0) * (0.25 + 0.35 * frac(seed * 4.7))
 
-                    let baseAngle = seed * 2.0 * .pi
+                    // Where each particle enters the cycle: its own spawn distance
+                    // and angle, so they never all start on the same ring.
+                    let spawnScale = 0.55 + 0.55 * frac(seed * 13.7)
+                    let baseAngle = (seed + 0.13 * frac(seed * 23.7)) * 2.0 * .pi
 
                     // Central exclusion zone: particles never reach the fan itself
                     let minReach = 0.16 * min(w, h) * (0.9 + 0.2 * frac(seed * 3.1))
@@ -58,12 +64,14 @@ public struct SmokeParticles: View {
                     let radius: Double
                     let turns: Double
                     if progress < 0.45 {
-                        radius = minReach + (maxReach - minReach) * pow(1.0 - inNorm, expB)
-                        // Vortex: rotation accelerates near the fan
-                        turns = turnsIn * (1.0 - pow(1.0 - inNorm, 2.0))
+                        radius = minReach + (maxReach * spawnScale - minReach) * pow(1.0 - inNorm, expB)
+                        // The closer to the fan, the faster they spin
+                        turns = turnsIn * pow(inNorm, 2.0)
                     } else {
-                        radius = minReach + (maxReach - minReach) * pow(outNorm, expB)
-                        turns = turnsIn + turnsOut * pow(outNorm, 1.5)
+                        radius = minReach + (maxReach - minReach) * pow(outNorm, expOut)
+                        // Leaving the fan: rotation keeps winding down while the
+                        // radial motion accelerates towards the screen edges.
+                        turns = turnsIn + turnsOut * (1.0 - pow(1.0 - outNorm, 2.0))
                     }
                     let angle = baseAngle + wobble + turns
 
