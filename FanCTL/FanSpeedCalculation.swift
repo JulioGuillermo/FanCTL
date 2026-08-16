@@ -15,7 +15,7 @@ struct FanSpeedCalculation {
     let targetRPM: Double?
 
     static func compute(fan: FanInfo, config: FanSettings, sensors: [SensorInfo]) -> FanSpeedCalculation {
-        let selectedSensors = sensors.filter { config.selectedSensorKeys.contains($0.id) }
+        let selectedSensors = sensors.filter { config.selectedSensorKeys.contains($0.id) && $0.isTemperature }
         let maxTemp = selectedSensors.map(\.value).max()
 
         guard let maxTemp else {

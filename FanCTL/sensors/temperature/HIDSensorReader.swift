@@ -103,7 +103,8 @@ final class HIDSensorReader {
                             thermalZone: zoneProp ?? "PMU Zone",
                             usagePage: usagePageProp ?? 0xFF00,
                             usage: usageProp ?? 5,
-                            descriptionText: SensorDescriptions.description(for: rawName, category: category)
+                            descriptionText: SensorDescriptions.description(for: rawName, category: category),
+                            unit: "°C"
                         )
 
                         // Avoid duplicates by name

@@ -32,6 +32,10 @@ enum SensorDescriptions {
         switch category {
         case .socDie:
             return "Sensor embedded in the processor silicon (SoC M4). Measures CPU cores (P-Core/E-Core), GPU or Neural Engine."
+        case .gpu:
+            return "GPU temperature sensor of the Apple Silicon SoC. Rises with graphics load (Metal/OpenCL) or heavy display work."
+        case .memory:
+            return "Temperature of the unified memory (RAM) soldered to the SoC. Rises with memory-heavy workloads."
         case .pmuBoard:
             return "Peripheral sensor on the motherboard / PMIC power management circuit."
         case .powerManagement:
@@ -42,6 +46,10 @@ enum SensorDescriptions {
             return "Thermal sensor on the battery or charge controller."
         case .smcGlobal:
             return "Direct reading through the AppleSMC firmware register key (\(rawKey))."
+        case .power:
+            return "Power consumption (watts) measured by the power delivery controller and exposed by the AppleSMC register key (\(rawKey))."
+        case .voltage:
+            return "Voltage (volts) of a power rail measured by the power delivery controller and exposed by the AppleSMC register key (\(rawKey))."
         case .unknown:
             return "Sensor reported by the macOS IOHID ThermalZone interface."
         }
@@ -61,6 +69,55 @@ enum SensorDescriptions {
         }
         if key.contains("nand") {
             return "SSD (NAND)"
+        }
+        if key.hasPrefix("tp") {
+            return "CPU P-core"
+        }
+        if key.hasPrefix("te") {
+            return "CPU E-core"
+        }
+        if key.hasPrefix("tg") {
+            return "GPU"
+        }
+        if key.hasPrefix("tm") {
+            return "Memory"
+        }
+        if key.hasPrefix("ts") {
+            return "SoC"
+        }
+        if key.hasPrefix("ta") {
+            return "Ambient"
+        }
+        if key.hasPrefix("tz") {
+            return "Thermal zone"
+        }
+        if key.hasPrefix("tfc") {
+            return "SoC cluster"
+        }
+        if key.hasPrefix("th0") {
+            return "Heatsink"
+        }
+        if key.hasPrefix("tpd") || key.hasPrefix("tps") {
+            return "Power delivery"
+        }
+        if key.hasPrefix("trd") {
+            return "Regulator"
+        }
+        if key.hasPrefix("pstr") || key.hasPrefix("pd0r") || key.hasPrefix("pdtr") {
+            return "Platform power"
+        }
+        if key.hasPrefix("ph") {
+            return "CPU / PMIC power"
+        }
+        if key.hasPrefix("pp") || key.hasPrefix("pr") || key.hasPrefix("pz") || key.hasPrefix("pb") {
+            return "Power rail"
+        }
+        if key.hasPrefix("vdr") || key.hasPrefix("vd") {
+            return "DC-in voltage"
+        }
+        if key.hasPrefix("vp") || key.hasPrefix("vr") || key.hasPrefix("vsw")
+            || key.hasPrefix("vldo") || key.hasPrefix("vb") || key.hasPrefix("vm") {
+            return "Voltage rail"
         }
         return "Sensor"
     }

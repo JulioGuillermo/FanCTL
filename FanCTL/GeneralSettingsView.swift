@@ -13,6 +13,10 @@ struct GeneralSettingsView: View {
 
     private let intervalOptions: [Double] = [0.5, 1, 2, 3, 5, 10, 15, 30, 60]
 
+    private var temperatureSensors: [SensorInfo] {
+        sensors.filter(\.isTemperature)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
@@ -81,18 +85,18 @@ struct GeneralSettingsView: View {
                     SensorSortMenu(sortMode: $sortMode)
                 }
 
-                if !sensors.isEmpty {
+                if !temperatureSensors.isEmpty {
                     HStack {
-                        Text("Sensors: \(store.settings.maxTempSensorKeys.count)/\(sensors.count)")
+                        Text("Sensors: \(store.settings.maxTempSensorKeys.count)/\(temperatureSensors.count)")
                             .font(.caption)
                             .foregroundColor(.secondary)
                         Spacer()
-                        Button("All") { store.setMaxTempSensorKeys(sensors.map(\.id)) }
+                        Button("All") { store.setMaxTempSensorKeys(temperatureSensors.map(\.id)) }
                         Button("None") { store.setMaxTempSensorKeys([]) }
                     }
                     .font(.caption)
 
-                    List(sortedSensors(sensors, by: sortMode), id: \.id) { sensor in
+                    List(sortedSensors(temperatureSensors, by: sortMode), id: \.id) { sensor in
                         SensorCheckRow(
                             sensor: sensor,
                             isSelected: store.settings.maxTempSensorKeys.contains(sensor.id),

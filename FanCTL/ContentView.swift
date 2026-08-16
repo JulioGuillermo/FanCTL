@@ -211,9 +211,9 @@ struct LeftPanelSensorsView: View {
 
     private var maxTempSensor: SensorInfo? {
         if maxTempSensorKeys.isEmpty {
-            return sensors.max { $0.value < $1.value }
+            return sensors.filter(\.isTemperature).max { $0.value < $1.value }
         }
-        let pool = sensors.filter { maxTempSensorKeys.contains($0.id) }
+        let pool = sensors.filter { maxTempSensorKeys.contains($0.id) && $0.isTemperature }
         return pool.max { $0.value < $1.value }
     }
 
@@ -243,7 +243,7 @@ struct LeftPanelSensorsView: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Thermal sensors")
+                        Text("Hardware sensors")
                             .font(.title3)
                             .bold()
                         Text("Direct IOKit access")
@@ -496,6 +496,7 @@ struct SensorRowView: View {
     var onTapDetails: () -> Void = {}
 
     private var temperatureColor: Color {
+        guard sensor.isTemperature else { return .secondary }
         if sensor.value < 45 { return .green }
         if sensor.value < 65 { return .orange }
         return .red
@@ -521,7 +522,7 @@ struct SensorRowView: View {
 
             Spacer()
 
-            Text(String(format: "%.1f °C", sensor.value))
+            Text(sensor.displayValue)
                 .font(.system(.body, design: .monospaced))
                 .bold()
                 .foregroundColor(temperatureColor)
@@ -555,7 +556,7 @@ struct SensorDetailView: View {
             Divider()
 
             Group {
-                MetaRow(label: "Current Temperature", value: String(format: "%.2f °C", sensor.value))
+                MetaRow(label: "Current Value", value: sensor.displayValue)
                 MetaRow(label: "Category", value: sensor.category.rawValue)
                 MetaRow(label: "Source (API)", value: sensor.source.rawValue)
                 MetaRow(label: "Thermal Zone", value: sensor.thermalZone ?? "N/A")

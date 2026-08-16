@@ -97,7 +97,7 @@ struct SensorCheckRow: View {
 
             Spacer()
 
-            Text(String(format: "%.1f °C", sensor.value))
+            Text(sensor.displayValue)
                 .font(.system(.body, design: .monospaced))
                 .foregroundColor(.secondary)
         }

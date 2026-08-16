@@ -22,8 +22,12 @@ struct FanSettingsView: View {
         FanSpeedCalculation.compute(fan: fan, config: config, sensors: sensors)
     }
 
+    private var temperatureSensors: [SensorInfo] {
+        sensors.filter(\.isTemperature)
+    }
+
     private var selectedCount: Int {
-        sensors.filter { config.selectedSensorKeys.contains($0.id) }.count
+        temperatureSensors.filter { config.selectedSensorKeys.contains($0.id) }.count
     }
 
     var body: some View {
@@ -126,8 +130,8 @@ struct FanSettingsView: View {
                     }
                     .font(.caption)
 
-                    if !sensors.isEmpty {
-                        List(sortedSensors(sensors, by: sortMode), id: \.id) { sensor in
+                    if !temperatureSensors.isEmpty {
+                        List(sortedSensors(temperatureSensors, by: sortMode), id: \.id) { sensor in
                             SensorCheckRow(
                                 sensor: sensor,
                                 isSelected: config.selectedSensorKeys.contains(sensor.id),
@@ -188,8 +192,8 @@ struct FanSettingsView: View {
         .frame(width: 500)
         .onAppear {
             // By default, if there is no saved selection, select all sensors
-            if config.selectedSensorKeys.isEmpty && !sensors.isEmpty {
-                config.selectedSensorKeys = sensors.map(\.id)
+            if config.selectedSensorKeys.isEmpty && !temperatureSensors.isEmpty {
+                config.selectedSensorKeys = temperatureSensors.map(\.id)
             }
             if config.manualRPM < fan.minRPM || config.manualRPM > fan.maxRPM {
                 config.manualRPM = fan.minRPM + (fan.maxRPM - fan.minRPM) * 0.3
@@ -244,7 +248,7 @@ struct FanSettingsView: View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 if config.mode == .automatic {
-                    Text("Sensors: \(selectedCount)/\(sensors.count)")
+                    Text("Sensors: \(selectedCount)/\(temperatureSensors.count)")
                         .font(.caption)
                         .foregroundColor(.secondary)
                     if let maxTemp = calculation.maxSelectedTemperature {
@@ -360,6 +364,6 @@ struct FanSettingsView: View {
     }
 
     private func selectAll() {
-        config.selectedSensorKeys = sensors.map(\.id)
+        config.selectedSensorKeys = temperatureSensors.map(\.id)
     }
 }

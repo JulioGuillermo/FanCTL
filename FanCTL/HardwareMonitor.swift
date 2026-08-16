@@ -9,7 +9,9 @@ final class HardwareMonitor: ObservableObject {
     @Published private(set) var fanCount = 0
 
     func update(sensors: [SensorInfo], fans: [FanInfo], maxTempSensorKeys: [String]) {
-        let pool = maxTempSensorKeys.isEmpty ? sensors : sensors.filter { maxTempSensorKeys.contains($0.id) }
+        let pool = maxTempSensorKeys.isEmpty
+            ? sensors.filter(\.isTemperature)
+            : sensors.filter { maxTempSensorKeys.contains($0.id) && $0.isTemperature }
         maxTemperature = pool.map(\.value).max()
         fanSpeeds = Dictionary(uniqueKeysWithValues: fans.map { ($0.id, $0.currentRPM) })
         fanCount = fans.count
