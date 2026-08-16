@@ -122,17 +122,11 @@ public struct FanListItem: View {
         .background(
             RoundedRectangle(cornerRadius: 14)
                 .fill(
-                    Color(
-                        red: 0,
-                        green: 0.03,
-                        blue: 0.2,
-                    ).opacity(0.6)
+                    GlassPannelColor
                 )
         )
         .glassEffect(
-            //            .clear.tint(.black.opacity(0.60)).interactive(),
             .clear,
-            //            .regular,
             in: RoundedRectangle(cornerRadius: 14)
         )
         .overlay {
