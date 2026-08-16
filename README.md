@@ -30,7 +30,7 @@ FanCTL is a menu bar app that reads the system's thermal sensors through SMC and
 
 ## Requirements
 
-- Mac with Apple Silicon and macOS 14 or later (only tested on the M4 chip and macOS Tahoe 26.6.1).
+- Mac with Apple Silicon and macOS 26 or later (only tested on the M4 chip and macOS Tahoe 26.6.1).
 - Fan control requires a **privileged daemon** that performs the SMC writes on your behalf (macOS blocks direct writes to the fan keys).
 
 ## Installation
