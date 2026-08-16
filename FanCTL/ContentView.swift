@@ -371,68 +371,47 @@ struct RightPanelFansView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Panel header with the detected machine
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    HStack(spacing: 10) {
-                        Image(systemName: systemInfo.type.iconName)
-                            .font(.system(size: 30))
-                            .foregroundColor(.blue)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(systemInfo.type.rawValue)
-                                .font(.title3)
-                                .bold()
-                            Text("\(systemInfo.computerName) • \(systemInfo.modelIdentifier)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
+            // Status indicator + general settings
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(isConnected ? Color.green : Color.red)
+                    .frame(width: 8, height: 8)
+                Text(connectionStatus)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
 
-                    Spacer()
+                Spacer()
 
-                    Button(action: onGeneralSettings) {
-                        Image(systemName: "gearshape")
-                            .font(.title3)
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.glass)
-                    .help("General settings")
+                if controlActive {
+                    Text("Control active")
+                        .font(.caption2)
+                        .bold()
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.blue.opacity(0.15))
+                        .foregroundColor(.blue)
+                        .cornerRadius(4)
+                } else {
+                    Text("Control requires root")
+                        .font(.caption2)
+                        .bold()
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.orange.opacity(0.15))
+                        .foregroundColor(.orange)
+                        .cornerRadius(4)
                 }
 
-                // Status indicator
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(isConnected ? Color.green : Color.red)
-                        .frame(width: 8, height: 8)
-                    Text(connectionStatus)
-                        .font(.caption)
+                Button(action: onGeneralSettings) {
+                    Image(systemName: "gearshape")
+                        .font(.title3)
                         .foregroundColor(.secondary)
-
-                    Spacer()
-
-                    if controlActive {
-                        Text("Control active")
-                            .font(.caption2)
-                            .bold()
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.blue.opacity(0.15))
-                            .foregroundColor(.blue)
-                            .cornerRadius(4)
-                    } else {
-                        Text("Control requires root")
-                            .font(.caption2)
-                            .bold()
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.orange.opacity(0.15))
-                            .foregroundColor(.orange)
-                            .cornerRadius(4)
-                    }
                 }
+                .buttonStyle(.glass)
+                .help("General settings")
             }
             .padding(.horizontal)
-            .padding(.top, 8)
+            .padding(.top, 4)
 
             Divider()
             if !controlActive {
@@ -524,6 +503,24 @@ struct RightPanelFansView: View {
             }
 
             Spacer()
+        }
+        .toolbar {
+            // Detected machine, plain text in the window app bar (leading)
+            ToolbarItem(placement: .navigation) {
+                HStack(spacing: 10) {
+                    Image(systemName: systemInfo.type.iconName)
+                        .font(.system(size: 30))
+                        .foregroundColor(.blue)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(systemInfo.type.rawValue)
+                            .font(.title3)
+                            .bold()
+                        Text("\(systemInfo.computerName) • \(systemInfo.modelIdentifier)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
         }
     }
 }
