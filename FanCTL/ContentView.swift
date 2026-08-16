@@ -193,20 +193,33 @@ struct ContentView: View {
         isScanning = true
         AppLog.log("[Content] refreshSensors() started")
 
-        let snapshot = SensorsReader().readAll()
-        self.sensors = Self.stabilizedSensors(snapshot.sensors, against: sensors)
-        self.fans = snapshot.fans
-        self.isConnected = snapshot.connectionOk
-        self.connectionStatus = snapshot.connectionOk ? "Connected" : "Connection error"
-        hardwareMonitor.update(
-            sensors: snapshot.sensors,
-            fans: snapshot.fans,
-            maxTempSensorKeys: settingsStore.settings.maxTempSensorKeys
-        )
-        AppLog.log("[Content] Total sensors: \(snapshot.sensors.count), Fans: \(snapshot.fans.count), connectionOk: \(snapshot.connectionOk)")
+        // The actual hardware scan (SMC/HID IPC reads of ~200 sensors) is
+        // slow and blocks the main thread, freezing the UI and the fan
+        // animation for an instant on every refresh. Run the read + merge on
+        // a background queue and only apply the result on the main thread.
+        let previousSensors = sensors
+        let maxTempKeys = settingsStore.settings.maxTempSensorKeys
 
-        isScanning = false
-        applyFanControl()
+        DispatchQueue.global(qos: .userInitiated).async {
+            let snapshot = SensorsReader().readAll()
+            let mergedSensors = Self.stabilizedSensors(snapshot.sensors, against: previousSensors)
+
+            DispatchQueue.main.async {
+                self.sensors = mergedSensors
+                self.fans = snapshot.fans
+                self.isConnected = snapshot.connectionOk
+                self.connectionStatus = snapshot.connectionOk ? "Connected" : "Connection error"
+                self.hardwareMonitor.update(
+                    sensors: snapshot.sensors,
+                    fans: snapshot.fans,
+                    maxTempSensorKeys: maxTempKeys
+                )
+                AppLog.log("[Content] Total sensors: \(snapshot.sensors.count), Fans: \(snapshot.fans.count), connectionOk: \(snapshot.connectionOk)")
+
+                self.isScanning = false
+                self.applyFanControl()
+            }
+        }
     }
 }
 
