@@ -18,6 +18,19 @@ import Foundation
 ///
 /// Power and voltage keys are reported by the power delivery controller and are
 /// useful to see what the machine is doing, but they are NOT temperatures.
+///
+/// # Min/current/max triples
+///
+/// The silicon temperature families (`Tp`, `Te`, `Tg`) expose each core block
+/// as a *group* of registers: the three keys of a triple are the MINIMUM,
+/// CURRENT and MAXIMUM temperature of the same block (GPU blocks are exposed
+/// as current/max pairs). Stats only shows the "current" register of each
+/// block, which is why its values (~40-50 °C) are lower than the raw max
+/// registers (~56-73 °C).
+///
+/// This reader collapses each group into a single sensor reporting the current
+/// value: the MEDIAN of a triple, or the MINIMUM of a pair (verified against a
+/// full key dump on this machine).
 final class TemperatureSMCReader {
     private let client: SMCClient
 
@@ -28,7 +41,27 @@ final class TemperatureSMCReader {
         let unit: String
     }
 
+    /// A cluster of SMC keys that together describe one core block.
+    /// Each group is `min/current/max` (3 keys) or `current/max` (2 keys).
+    private struct ClusterSpec {
+        let prefix: String
+        let groups: [[String]]
+        let name: String
+        let category: SensorCategory
+        let unit: String
+
+        init(prefix: String, groups: [[String]], name: String,
+             category: SensorCategory, unit: String = "°C") {
+            self.prefix = prefix
+            self.groups = groups
+            self.name = name
+            self.category = category
+            self.unit = unit
+        }
+    }
+
     private let specs: [KeySpec] = TemperatureSMCReader.buildSpecs()
+    private let clusters: [ClusterSpec] = TemperatureSMCReader.buildClusters()
 
     init(client: SMCClient = SMCClient()) {
         self.client = client
@@ -40,6 +73,57 @@ final class TemperatureSMCReader {
         guard client.open() else { return ([], false) }
         defer { client.close() }
 
+        var results: [SensorInfo] = []
+        results.append(contentsOf: readClusters())
+        results.append(contentsOf: readSpecs())
+
+        return (results, true)
+    }
+
+    /// Reads the core-block clusters and collapses each group to its "current" value.
+    private func readClusters() -> [SensorInfo] {
+        var results: [SensorInfo] = []
+
+        for cluster in clusters {
+            var values: [String: Double] = [:]
+            for suffix in cluster.groups.flatMap({ $0 }) {
+                let key = cluster.prefix + suffix
+                if let data = client.readKeyData(key),
+                   let value = TemperatureDataParser.value(from: data, unit: cluster.unit) {
+                    values[key] = value
+                }
+            }
+
+            for (index, group) in cluster.groups.enumerated() {
+                let keys = group.map { cluster.prefix + $0 }
+                let readings = keys.compactMap { values[$0] }
+                guard readings.count == keys.count else { continue }
+
+                // Triple -> median (current), pair -> minimum (current).
+                let current = readings.count == 2 ? readings.min()! : readings.sorted()[1]
+                let currentKey = keys[readings.firstIndex(of: current)!]
+                let name = "\(cluster.name) \(index + 1)"
+
+                results.append(SensorInfo(
+                    id: currentKey,
+                    rawKey: currentKey,
+                    value: current,
+                    source: .smc,
+                    category: cluster.category,
+                    thermalZone: "AppleSMC Subsystem",
+                    usagePage: nil,
+                    usage: nil,
+                    descriptionText: "Current temperature of \(name), exposed by the AppleSMC register key \(currentKey). Each core block is reported by the SMC as a group of min/current/max registers; this sensor shows the current reading, matching the value Stats shows.",
+                    unit: cluster.unit
+                ))
+            }
+        }
+
+        return results
+    }
+
+    /// Reads the remaining individual keys (non-silicon temperatures, power, voltage).
+    private func readSpecs() -> [SensorInfo] {
         var results: [SensorInfo] = []
 
         for spec in specs {
@@ -63,7 +147,7 @@ final class TemperatureSMCReader {
             ))
         }
 
-        return (results, true)
+        return results
     }
 
     private static func description(for key: String, category: SensorCategory, name: String) -> String {
@@ -89,6 +173,32 @@ final class TemperatureSMCReader {
 
     // MARK: - Key table (verified on M4)
 
+    /// Core-block clusters. Each group is min/current/max (3 keys) or
+    /// current/max (2 keys); the reader collapses it to the current value.
+    private static func buildClusters() -> [ClusterSpec] {
+        [
+            // CPU performance cores (P-cores): 11 triples + 3 pairs
+            ClusterSpec(prefix: "Tp", groups: [
+                ["00","01","02"], ["04","05","06"], ["08","09","0A"], ["0C","0D","0E"],
+                ["0U","0V","0W"], ["0X","0Y","0Z"], ["0a","0b","0c"], ["0d","0e","0f"],
+                ["1A","1B","1C"], ["1E","1F","1G"], ["1Q","1R","1S"],
+                ["3O","3P"], ["3S","3T"], ["3W","3X"]
+            ], name: "CPU P-core", category: .socDie),
+
+            // CPU efficiency cores (E-cores): 4 triples + 2 pairs
+            ClusterSpec(prefix: "Te", groups: [
+                ["04","05","06"], ["08","09","0A"], ["0G","0H","0I"], ["0R","0S","0T"],
+                ["0U","0V"], ["0W","0X"]
+            ], name: "CPU E-core", category: .socDie),
+
+            // GPU clusters: 9 current/max pairs
+            ClusterSpec(prefix: "Tg", groups: [
+                ["0C","0D"], ["0G","0H"], ["0K","0L"], ["0O","0P"], ["0U","0V"],
+                ["0X","0Y"], ["0d","0e"], ["0j","0k"], ["0m","0n"]
+            ], name: "GPU cluster", category: .gpu)
+        ]
+    }
+
     private static func buildSpecs() -> [KeySpec] {
         var list: [KeySpec] = []
 
@@ -104,20 +214,6 @@ final class TemperatureSMCReader {
                     _ unit: String = "°C") {
             list.append(KeySpec(key: key, name: name, category: category, unit: unit))
         }
-
-        // CPU performance cores (P-cores)
-        family("Tp", ["00","01","02","04","05","06","08","09","0A","0C","0D","0E",
-                      "0U","0V","0W","0X","0Y","0Z","0a","0b","0c","0d","0e","0f",
-                      "1A","1B","1C","1E","1F","1G","1Q","1R","1S",
-                      "3O","3P","3S","3T","3W","3X"], "CPU P-core", .socDie)
-
-        // CPU efficiency cores (E-cores)
-        family("Te", ["04","05","06","08","09","0A","0G","0H","0I",
-                      "0R","0S","0T","0U","0V","0W","0X"], "CPU E-core", .socDie)
-
-        // GPU clusters
-        family("Tg", ["0C","0D","0G","0H","0K","0L","0O","0P","0U","0V","0X","0Y",
-                      "0d","0e","0j","0k","0m","0n"], "GPU cluster", .gpu)
 
         // Unified memory (RAM)
         family("Tm", ["0p","1p","2p"], "Memory", .memory)
