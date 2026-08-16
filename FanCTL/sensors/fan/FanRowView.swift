@@ -44,23 +44,18 @@ struct FanRowView: View {
                         .font(.title3)
                         .foregroundColor(.secondary)
                 }
-                .buttonStyle(.glass)
+                .buttonStyle(.plain)
                 .help("Settings for \(fan.name)")
             }
 
-            // Control mode selector (visible and direct)
-            Picker("Mode", selection: Binding(
-                get: { mode },
-                set: { onChangeMode($0) }
-            )) {
-                ForEach(FanMode.allCases, id: \.self) { candidate in
-                    Label(candidate.rawValue, systemImage: candidate.iconName)
-                        .tag(candidate)
-                }
-            }
-            .pickerStyle(.segmented)
-            .tint(.blue)
-            .labelsHidden()
+            // Control mode selector as a floating glass pill
+            SelectorLiquidGlass(
+                mode: Binding(
+                    get: { mode },
+                    set: { onChangeMode($0) }
+                ),
+                onChange: onChangeMode
+            )
 
             // Manual speed slider
             if mode == .manual {
