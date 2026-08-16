@@ -1,0 +1,88 @@
+# Builds the FanCTL app + DMG and publishes them as a GitHub Release.
+#
+# Triggered by pushing a tag like `v1.0.0`:
+#   git tag v1.0.0 && git push origin v1.0.0
+#
+# Also available as a manual "Run workflow" with an optional tag name input.
+#
+# NOTE: the app is signed AD-HOC (no Apple Developer certificate). Users must
+# right-click the app -> Open the first time, since Gatekeeper has no notarized
+# signature to trust.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name for the release (e.g. v1.0.0)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build app and DMG
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          xcode-select -p
+
+      # Build Release with the same ad-hoc signing used locally. Manual
+      # signing with identity "-" guarantees the build succeeds on a runner
+      # that has no Apple Developer team configured.
+      - name: Build FanCTL.app (Release)
+        run: |
+          xcodebuild \
+            -project FanCTL.xcodeproj \
+            -scheme FanCTL \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=YES \
+            build
+
+      - name: Verify bundle
+        run: |
+          APP=build/Build/Products/Release/FanCTL.app
+          test -d "$APP"
+          codesign -dv "$APP" 2>&1 | grep -E 'Identifier|Signature' || true
+          ls "$APP/Contents/Helpers" "$APP/Contents/Library/LaunchDaemons"
+
+      # DMG the user drags to Applications.
+      - name: Create DMG
+        run: |
+          sh scripts/build_dmg.sh \
+            "$PWD/build/Build/Products/Release/FanCTL.app" \
+            "$PWD/FanCTL.dmg"
+          ls -lh FanCTL.dmg
+
+      # ZIP for anyone who prefers the raw .app over the DMG.
+      - name: Zip the app
+        run: |
+          ditto -c -k --keepParent \
+            build/Build/Products/Release/FanCTL.app \
+            FanCTL.zip
+          ls -lh FanCTL.zip
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag_name }}
+          files: |
+            FanCTL.dmg
+            FanCTL.zip
+          generate_release_notes: true
+          fail_on_unmatched_files: true
