@@ -105,10 +105,7 @@ final class StatusBarController: ObservableObject {
             let color = TemperatureIndicator.color(for: max)
             let symbol = TemperatureIndicator.iconName(for: max)
             attr.append(NSAttributedString(attachment: attachment(symbol: symbol, size: 13, color: NSColor(color))))
-            attr.append(NSAttributedString(
-                string: String(format: " %.1f°C", max),
-                attributes: [.foregroundColor: NSColor(color)]
-            ))
+            attr.append(NSAttributedString(string: String(format: " %.1f°C", max)))
         }
 
         // Animated fan icon (rotating, colored by speed) + speed
