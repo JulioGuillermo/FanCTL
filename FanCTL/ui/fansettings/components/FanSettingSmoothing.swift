@@ -57,5 +57,6 @@ public struct FanSettingSmoothing: View {
                 }
             }
         }
+        .animation(.easeInOut(duration: 0.25), value: config.filterEnabled)
     }
 }
