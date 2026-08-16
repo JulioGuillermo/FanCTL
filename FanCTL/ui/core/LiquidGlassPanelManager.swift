@@ -32,10 +32,10 @@ final class LiquidGlassPanelManager {
         let hosting = NSHostingController(rootView: content)
 
         let newPanel = TransparentLiquidPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 480, height: 480),
-            styleMask: [.borderless],
+            contentRect: NSRect(x: 0, y: 0, width: 720, height: 480),
+            styleMask: [.borderless, .resizable],
             backing: .buffered,
-            defer: false
+            defer: false,
         )
 
         newPanel.isOpaque = false
@@ -49,7 +49,7 @@ final class LiquidGlassPanelManager {
         newPanel.contentView = hosting.view
         newPanel.layoutIfNeeded()
         let size = hosting.view.fittingSize
-        newPanel.setContentSize(size)
+//        newPanel.setContentSize(size)
 
         if let parent = parentWindow {
             let x = parent.frame.midX - size.width / 2

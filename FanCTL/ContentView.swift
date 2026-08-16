@@ -1,5 +1,5 @@
-import SwiftUI
 internal import Combine
+import SwiftUI
 
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
@@ -20,7 +20,8 @@ struct ContentView: View {
     @State private var panelManager = LiquidGlassPanelManager()
 
     // 0.5s ticker to respect the configured rescan interval
-    private let ticker = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
+    private let ticker = Timer.publish(every: 0.5, on: .main, in: .common)
+        .autoconnect()
 
     var body: some View {
         ZStack {
@@ -37,28 +38,30 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 280, ideal: 320, max: 400)
             } detail: {
                 RightPanelFansView(
-                fans: fans,
-                systemInfo: SystemInfo.shared,
-                isConnected: isConnected,
-                connectionStatus: connectionStatus,
-                controlActive: daemonClient.isAvailable || fanController.canControlHardware,
-                controlError: daemonClient.lastError,
-                isRequestingPermissions: daemonClient.isRequestingPermissions,
-                modeFor: mode(for:),
-                desiredRPMFor: desiredRPM(for:),
-                manualRPMFor: manualRPM(for:),
-                minSpeedRPMFor: minSpeedRPM(for:),
-                maxSpeedRPMFor: maxSpeedRPM(for:),
-                onChangeMode: { fan, mode in
-                    changeMode(mode, for: fan)
-                },
-                onManualRPMChange: { fan, rpm in
-                    changeManualRPM(rpm, for: fan)
-                },
+                    fans: fans,
+                    systemInfo: SystemInfo.shared,
+                    isConnected: isConnected,
+                    connectionStatus: connectionStatus,
+                    controlActive: daemonClient.isAvailable
+                        || fanController.canControlHardware,
+                    controlError: daemonClient.lastError,
+                    isRequestingPermissions: daemonClient
+                        .isRequestingPermissions,
+                    modeFor: mode(for:),
+                    desiredRPMFor: desiredRPM(for:),
+                    manualRPMFor: manualRPM(for:),
+                    minSpeedRPMFor: minSpeedRPM(for:),
+                    maxSpeedRPMFor: maxSpeedRPM(for:),
+                    onChangeMode: { fan, mode in
+                        changeMode(mode, for: fan)
+                    },
+                    onManualRPMChange: { fan, rpm in
+                        changeManualRPM(rpm, for: fan)
+                    },
                     onGeneralSettings: { presentGeneralSettings() },
                     onFanSettings: { presentFanSettings($0) },
                     onRequestControl: { requestControlPermissions() }
-            )
+                )
                 .frame(minWidth: 480, maxWidth: .infinity)
             }
         }
@@ -81,7 +84,11 @@ struct ContentView: View {
             // control continues. Only real closing (Cmd+Q) restores the system.
         }
         .background(WindowCloseHider())
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: NSApplication.willTerminateNotification
+            )
+        ) { _ in
             restoreSystemControl()
         }
         .sheet(item: $selectedSensor) { sensor in
@@ -135,11 +142,18 @@ struct ContentView: View {
         let highRPM = config.effectiveMaxRPM(fanMaxRPM: fan.maxRPM)
         switch config.mode {
         case .automatic:
-            let calc = FanSpeedCalculation.compute(fan: fan, config: config, sensors: sensors)
+            let calc = FanSpeedCalculation.compute(
+                fan: fan,
+                config: config,
+                sensors: sensors
+            )
             let target = calc.targetRPM ?? lowRPM
             if config.filterEnabled {
-                let previous = fanController.appliedSpeeds[fan.id] ?? fan.currentRPM
-                let blended = previous * (1 - config.filterFactor) + target * config.filterFactor
+                let previous =
+                    fanController.appliedSpeeds[fan.id] ?? fan.currentRPM
+                let blended =
+                    previous * (1 - config.filterFactor) + target
+                    * config.filterFactor
                 return min(max(blended, lowRPM), highRPM)
             }
             return min(max(target, lowRPM), highRPM)
@@ -154,15 +168,25 @@ struct ContentView: View {
 
     private func manualRPM(for fan: FanInfo) -> Double {
         let config = settingsStore.fanSettings(for: fan)
-        return min(max(config.manualRPM, config.effectiveMinRPM(fanMinRPM: fan.minRPM)), config.effectiveMaxRPM(fanMaxRPM: fan.maxRPM))
+        return min(
+            max(
+                config.manualRPM,
+                config.effectiveMinRPM(fanMinRPM: fan.minRPM)
+            ),
+            config.effectiveMaxRPM(fanMaxRPM: fan.maxRPM)
+        )
     }
 
     private func minSpeedRPM(for fan: FanInfo) -> Double {
-        settingsStore.fanSettings(for: fan).effectiveMinRPM(fanMinRPM: fan.minRPM)
+        settingsStore.fanSettings(for: fan).effectiveMinRPM(
+            fanMinRPM: fan.minRPM
+        )
     }
 
     private func maxSpeedRPM(for fan: FanInfo) -> Double {
-        settingsStore.fanSettings(for: fan).effectiveMaxRPM(fanMaxRPM: fan.maxRPM)
+        settingsStore.fanSettings(for: fan).effectiveMaxRPM(
+            fanMaxRPM: fan.maxRPM
+        )
     }
 
     private func changeMode(_ mode: FanMode, for fan: FanInfo) {
@@ -174,7 +198,10 @@ struct ContentView: View {
 
     private func changeManualRPM(_ rpm: Double, for fan: FanInfo) {
         var config = settingsStore.fanSettings(for: fan)
-        config.manualRPM = min(max(rpm, config.effectiveMinRPM(fanMinRPM: fan.minRPM)), config.effectiveMaxRPM(fanMaxRPM: fan.maxRPM))
+        config.manualRPM = min(
+            max(rpm, config.effectiveMinRPM(fanMinRPM: fan.minRPM)),
+            config.effectiveMaxRPM(fanMaxRPM: fan.maxRPM)
+        )
         settingsStore.updateFanSettings(config)
     }
 
@@ -188,7 +215,9 @@ struct ContentView: View {
             let config = settingsStore.fanSettings(for: fan)
             let desired = desiredRPM(for: fan)
             fanController.setSpeed(desired, toFan: fan.id)
-            AppLog.log("[Content] F\(fan.id) mode=\(config.mode.rawValue) target=\(Int(desired)) RPM")
+            AppLog.log(
+                "[Content] F\(fan.id) mode=\(config.mode.rawValue) target=\(Int(desired)) RPM"
+            )
         }
     }
 
@@ -203,9 +232,13 @@ struct ContentView: View {
     /// on a single scan (transient AppleSMC hiccup, core parked) stays in the
     /// list with its last known value instead of disappearing and making the
     /// list/scroll position jump.
-    private static func stabilizedSensors(_ newSensors: [SensorInfo],
-                                          against previous: [SensorInfo]) -> [SensorInfo] {
-        var byID = Dictionary(uniqueKeysWithValues: newSensors.map { ($0.id, $0) })
+    private static func stabilizedSensors(
+        _ newSensors: [SensorInfo],
+        against previous: [SensorInfo]
+    ) -> [SensorInfo] {
+        var byID = Dictionary(
+            uniqueKeysWithValues: newSensors.map { ($0.id, $0) }
+        )
         for stale in previous where byID[stale.id] == nil {
             byID[stale.id] = stale
         }
@@ -226,19 +259,25 @@ struct ContentView: View {
 
         DispatchQueue.global(qos: .userInitiated).async {
             let snapshot = SensorsReader().readAll()
-            let mergedSensors = Self.stabilizedSensors(snapshot.sensors, against: previousSensors)
+            let mergedSensors = Self.stabilizedSensors(
+                snapshot.sensors,
+                against: previousSensors
+            )
 
             DispatchQueue.main.async {
                 self.sensors = mergedSensors
                 self.fans = snapshot.fans
                 self.isConnected = snapshot.connectionOk
-                self.connectionStatus = snapshot.connectionOk ? "Connected" : "Connection error"
+                self.connectionStatus =
+                    snapshot.connectionOk ? "Connected" : "Connection error"
                 self.hardwareMonitor.update(
                     sensors: snapshot.sensors,
                     fans: snapshot.fans,
                     maxTempSensorKeys: maxTempKeys
                 )
-                AppLog.log("[Content] Total sensors: \(snapshot.sensors.count), Fans: \(snapshot.fans.count), connectionOk: \(snapshot.connectionOk)")
+                AppLog.log(
+                    "[Content] Total sensors: \(snapshot.sensors.count), Fans: \(snapshot.fans.count), connectionOk: \(snapshot.connectionOk)"
+                )
 
                 self.isScanning = false
                 self.applyFanControl()
@@ -246,7 +285,6 @@ struct ContentView: View {
         }
     }
 }
-
 
 /// Full IOKit metadata inspection modal
 struct SensorDetailView: View {
@@ -272,10 +310,16 @@ struct SensorDetailView: View {
                 MetaRow(label: "Current Value", value: sensor.displayValue)
                 MetaRow(label: "Category", value: sensor.category.rawValue)
                 MetaRow(label: "Source (API)", value: sensor.source.rawValue)
-                MetaRow(label: "Thermal Zone", value: sensor.thermalZone ?? "N/A")
+                MetaRow(
+                    label: "Thermal Zone",
+                    value: sensor.thermalZone ?? "N/A"
+                )
 
                 if let up = sensor.usagePage {
-                    MetaRow(label: "PrimaryUsagePage", value: String(format: "0x%04X", up))
+                    MetaRow(
+                        label: "PrimaryUsagePage",
+                        value: String(format: "0x%04X", up)
+                    )
                 }
                 if let u = sensor.usage {
                     MetaRow(label: "PrimaryUsage", value: "\(u)")
