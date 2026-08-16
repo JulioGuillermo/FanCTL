@@ -24,19 +24,20 @@ struct ContentView: View {
     private let ticker = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        HStack(spacing: 0) {
-            // Left panel (small): read-only thermal sensors
-            LeftPanelSensorsView(
-                sensors: sensors,
-                selectedSensor: $selectedSensor,
-                maxTempSensorKeys: settingsStore.settings.maxTempSensorKeys
-            )
-            .frame(minWidth: 330, maxWidth: 380)
+        ZStack {
+            // Animated decorative background (drifting blobs + blurred fan)
+            AnimatedBackground()
 
-            Divider()
-
-            // Right panel (expandable): Machine, Status and Fans
-            RightPanelFansView(
+            // Finder-style split view: sensors sidebar + machine/fans detail
+            NavigationSplitView {
+                SidebarSensorsView(
+                    sensors: sensors,
+                    selectedSensor: $selectedSensor,
+                    maxTempSensorKeys: settingsStore.settings.maxTempSensorKeys
+                )
+                .navigationSplitViewColumnWidth(min: 280, ideal: 320, max: 400)
+            } detail: {
+                RightPanelFansView(
                 fans: fans,
                 systemInfo: SystemInfo.shared,
                 isConnected: isConnected,
@@ -59,8 +60,10 @@ struct ContentView: View {
                 onFanSettings: { settingsFan = $0 },
                 onRequestControl: { requestControlPermissions() }
             )
-            .frame(minWidth: 450, maxWidth: .infinity)
+                .frame(minWidth: 480, maxWidth: .infinity)
+            }
         }
+        .navigationTitle("FanCTL")
         .frame(minWidth: 960, minHeight: 640)
         .onAppear {
             fanController.checkPrivileges()
@@ -83,12 +86,15 @@ struct ContentView: View {
         }
         .sheet(item: $selectedSensor) { sensor in
             SensorDetailView(sensor: sensor)
+                .presentationBackground(.ultraThinMaterial)
         }
         .sheet(item: $settingsFan) { fan in
             FanSettingsView(fan: fan, sensors: sensors, store: settingsStore)
+                .presentationBackground(.ultraThinMaterial)
         }
         .sheet(isPresented: $showingGeneralSettings) {
             GeneralSettingsView(store: settingsStore, daemon: daemonClient, sensors: sensors)
+                .presentationBackground(.ultraThinMaterial)
         }
         .onReceive(daemonClient.$isAvailable) { available in
             // If the daemon becomes available (or goes down), recompute control
@@ -223,8 +229,9 @@ struct ContentView: View {
     }
 }
 
-/// Compact left panel with the read-only list of thermal sensors
-struct LeftPanelSensorsView: View {
+/// Finder-style sidebar: app branding at the top and the read-only sensor
+/// list floating directly on the sidebar material (no dark background).
+struct SidebarSensorsView: View {
     let sensors: [SensorInfo]
     @Binding var selectedSensor: SensorInfo?
     var maxTempSensorKeys: [String] = []
@@ -264,24 +271,19 @@ struct LeftPanelSensorsView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Sensor section header
-            VStack(alignment: .leading, spacing: 2) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Hardware sensors")
-                            .font(.title3)
-                            .bold()
-                        Text("Direct IOKit access")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    Spacer()
-                    SensorSortMenu(sortMode: $sortMode)
-                }
+        VStack(alignment: .leading, spacing: 8) {
+            // App branding, right below the window controls
+            HStack(spacing: 8) {
+                Image(systemName: "cpu.fill")
+                    .font(.system(size: 18))
+                    .foregroundStyle(.tint)
+                Text("FanCTL")
+                    .font(.headline)
+                    .bold()
+                Spacer()
             }
-            .padding(.horizontal)
-            .padding(.top)
+            .padding(.horizontal, 12)
+            .padding(.top, 10)
 
             // Maximum temperature (from the selected sensor or the hottest)
             HStack {
@@ -302,11 +304,21 @@ struct LeftPanelSensorsView: View {
                     .bold()
                     .foregroundColor(.secondary)
             }
-            .padding(.horizontal)
+            .padding(.horizontal, 12)
 
-            Divider()
+            // Section header: title + sort menu
+            HStack {
+                Text("Hardware sensors")
+                    .font(.caption)
+                    .bold()
+                    .foregroundColor(.secondary)
+                Spacer()
+                SensorSortMenu(sortMode: $sortMode)
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 2)
 
-            // Clean thermal sensor list
+            // Sensor list floating on the sidebar material
             if !sensors.isEmpty {
                 List(sortedSensorsList, id: \.id) { sensor in
                     SensorRowView(
@@ -314,8 +326,8 @@ struct LeftPanelSensorsView: View {
                         onTapDetails: { selectedSensor = sensor }
                     )
                 }
-                .listStyle(.plain)
-                .frame(minHeight: 240)
+                .listStyle(.sidebar)
+                .scrollContentBackground(.hidden)
             } else {
                 VStack(spacing: 12) {
                     Spacer()
@@ -332,7 +344,7 @@ struct LeftPanelSensorsView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .background(.ultraThinMaterial)
+        .navigationTitle("FanCTL")
     }
 }
 

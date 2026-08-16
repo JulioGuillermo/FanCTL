@@ -34,5 +34,8 @@ struct FanCTLApp: App {
                 .environmentObject(hardwareMonitor)
         }
         .defaultSize(width: 1100, height: 760)
+        // Integrate the title bar with the content: the window background
+        // extends to the top and only the traffic lights remain.
+        .windowStyle(.hiddenTitleBar)
     }
 }
