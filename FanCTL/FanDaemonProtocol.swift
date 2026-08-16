@@ -1,10 +1,10 @@
 import Foundation
 
-/// Protocolo XPC entre la app FanCTL y su daemon privilegiado.
+/// XPC protocol between the FanCTL app and its privileged daemon.
 ///
-/// Debe coincidir exactamente con el definido en el daemon
-/// (`FanDaemon/FanDaemonProtocol.swift`), ya que cada lado se compila en un
-/// módulo distinto.
+/// Must match exactly the one defined in the daemon
+/// (`FanDaemon/FanDaemonProtocol.swift`), since each side is compiled in a
+/// separate module.
 @objc protocol FanDaemonProtocol {
     func setFanSpeed(fanIndex: Int, rpm: Double, reply: @escaping (Bool) -> Void)
     func restoreSystemControl(fanIndex: Int, reply: @escaping (Bool) -> Void)

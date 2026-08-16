@@ -1,23 +1,23 @@
 import Foundation
 internal import Combine
 
-/// Configuración de control de un ventilador individual.
+/// Control configuration for a single fan.
 struct FanSettings: Codable, Equatable, Identifiable {
     var id: Int
     var name: String
-    /// Modo de control seleccionado por el usuario.
+    /// Control mode selected by the user.
     var mode: FanMode
-    /// Temperatura máxima (°C) que se desea mantener en los sensores seleccionados.
+    /// Maximum temperature (°C) to maintain on the selected sensors.
     var maxTemperature: Double
-    /// Temperatura mínima (°C) que se desea mantener en los sensores seleccionados.
+    /// Minimum temperature (°C) to maintain on the selected sensors.
     var minTemperature: Double
-    /// Identificadores de los sensores que controlan este ventilador.
+    /// IDs of the sensors that control this fan.
     var selectedSensorKeys: [String]
-    /// Velocidad fija en RPM para el modo manual.
+    /// Fixed speed in RPM for manual mode manual.
     var manualRPM: Double
-    /// Límite inferior personalizado (RPM); `nil` = rango real del ventilador.
+    /// Custom lower limit (RPM); `nil` = the fan's real range.
     var minRPM: Double?
-    /// Límite superior personalizado (RPM); `nil` = rango real del ventilador.
+    /// Custom upper limit (RPM); `nil` = the fan's real range.
     var maxRPM: Double?
 
     init(id: Int, name: String, mode: FanMode = .automatic, maxTemperature: Double = 90, minTemperature: Double = 30, selectedSensorKeys: [String] = [], manualRPM: Double = 1500, minRPM: Double? = nil, maxRPM: Double? = nil) {
@@ -36,7 +36,7 @@ struct FanSettings: Codable, Equatable, Identifiable {
         case id, name, mode, maxTemperature, minTemperature, selectedSensorKeys, manualRPM, minRPM, maxRPM
     }
 
-    /// Conserva los ajustes guardados en versiones anteriores (sin límites).
+    /// Preserves settings saved in previous versions (without limits).
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(Int.self, forKey: .id)
@@ -50,22 +50,38 @@ struct FanSettings: Codable, Equatable, Identifiable {
         maxRPM = try c.decodeIfPresent(Double.self, forKey: .maxRPM)
     }
 
-    /// Límite inferior efectivo (personalizado o real del ventilador).
+    /// Effective lower limit (custom or the fan's real).
     func effectiveMinRPM(fanMinRPM: Double) -> Double { minRPM ?? fanMinRPM }
 
-    /// Límite superior efectivo (personalizado o real del ventilador).
+    /// Effective upper limit (custom or the fan's real).
     func effectiveMaxRPM(fanMaxRPM: Double) -> Double { maxRPM ?? fanMaxRPM }
 }
 
-/// Ajustes generales y por ventilador de la app.
+/// General and per-fan settings of the app.
 struct AppSettings: Codable, Equatable {
-    /// Intervalo de reescaneo del hardware en segundos.
+    /// Hardware rescan interval in seconds.
     var refreshInterval: Double = 2.0
-    /// Configuración por ventilador.
+    /// Sensor chosen for the max temperature indicator; `nil` = automatic (the hottest).
+    var maxTempSensorKey: String? = nil
+    /// Per-fan configuration.
     var fans: [FanSettings] = []
+
+    enum CodingKeys: String, CodingKey {
+        case refreshInterval, maxTempSensorKey, fans
+    }
+
+    init() {}
+
+    /// Preserves settings saved in previous versions.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        refreshInterval = try c.decodeIfPresent(Double.self, forKey: .refreshInterval) ?? 2.0
+        maxTempSensorKey = try c.decodeIfPresent(String.self, forKey: .maxTempSensorKey)
+        fans = try c.decodeIfPresent([FanSettings].self, forKey: .fans) ?? []
+    }
 }
 
-/// Almacén persistente de configuración en `UserDefaults` (formato JSON).
+/// Persistent configuration store in `UserDefaults` (JSON format).
 final class SettingsStore: ObservableObject {
     @Published var settings: AppSettings = AppSettings()
 
@@ -77,7 +93,7 @@ final class SettingsStore: ObservableObject {
         load()
     }
 
-    /// Devuelve la configuración de un ventilador, creando una por defecto si no existe.
+    /// Returns the configuration of a fan, creating a default one if it does not exist.
     func fanSettings(for fan: FanInfo) -> FanSettings {
         if let existing = settings.fans.first(where: { $0.id == fan.id }) {
             return existing
@@ -85,7 +101,7 @@ final class SettingsStore: ObservableObject {
         return FanSettings(id: fan.id, name: fan.name)
     }
 
-    /// Guarda la configuración de un ventilador (inserta o reemplaza).
+    /// Saves the configuration of a fan (inserta o reemplaza).
     func updateFanSettings(_ fanSettings: FanSettings) {
         if let index = settings.fans.firstIndex(where: { $0.id == fanSettings.id }) {
             settings.fans[index] = fanSettings
@@ -97,6 +113,11 @@ final class SettingsStore: ObservableObject {
 
     func setRefreshInterval(_ interval: Double) {
         settings.refreshInterval = interval
+        save()
+    }
+
+    func setMaxTempSensorKey(_ key: String?) {
+        settings.maxTempSensorKey = key
         save()
     }
 

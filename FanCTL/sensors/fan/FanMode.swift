@@ -1,11 +1,11 @@
 import Foundation
 
-/// Modo de funcionamiento o control del ventilador.
+/// Fan operating/control mode.
 enum FanMode: String, Codable, CaseIterable {
     case automatic = "Auto"
     case manual = "Manual"
     case off = "Off"
-    case maximum = "Máximo"
+    case maximum = "Max"
 
     var iconName: String {
         switch self {

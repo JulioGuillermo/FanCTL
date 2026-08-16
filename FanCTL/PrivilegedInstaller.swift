@@ -1,12 +1,12 @@
 import Foundation
 
-/// Instala y desinstala el daemon de FanCTL en `/Library/PrivilegedHelperTools`
-/// y `/Library/LaunchDaemons` ejecutando un script como root mediante
-/// Authorization Services (pedirá la contraseña de administrador).
+/// Installs and uninstalls the FanCTL daemon in `/Library/PrivilegedHelperTools`
+/// and `/Library/LaunchDaemons` by running a script as root through
+/// Authorization Services (it will ask for the administrator password).
 ///
-/// A diferencia de `SMAppService.register`, este mecanismo no exige que la app
-/// esté firmada con un certificado válido, por lo que funciona también con
-/// firmas ad-hoc (p. ej. "Sign to Run Locally").
+/// Unlike `SMAppService.register`, this mechanism does not require the app
+/// to be signed with a valid certificate, so it also works with
+/// ad-hoc signatures (e.g. "Sign to Run Locally").
 enum PrivilegedInstaller {
     static let daemonName = "com.jg.FanCTL.daemon"
     static let installPath = "/Library/PrivilegedHelperTools/com.jg.FanCTL.daemon"
@@ -16,15 +16,15 @@ enum PrivilegedInstaller {
         FileManager.default.fileExists(atPath: installPath)
     }
 
-    /// Instala el binario del daemon (desde `Contents/Helpers/FanDaemon`),
-    /// escribe el plist de launchd y arranca el servicio como root.
+    /// Installs the daemon binary (from `Contents/Helpers/FanDaemon`),
+    /// writes the launchd plist and starts the service as root.
     static func install(completion: @escaping (_ ok: Bool, _ message: String?) -> Void) {
         let candidates = [
             Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/FanDaemon"),
             Bundle.main.bundleURL.appendingPathComponent("Contents/MacOS/FanDaemon")
         ]
         guard let source = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0.path) }) else {
-            completion(false, "No se encontró el binario del daemon dentro de la app.")
+            completion(false, "Daemon binary not found inside the app.")
             return
         }
 
@@ -82,7 +82,7 @@ enum PrivilegedInstaller {
         runAsRoot(script: script, completion: completion)
     }
 
-    /// Arranca (o reinicia) un daemon ya instalado, sin tocar sus archivos.
+    /// Starts (or restarts) an already installed daemon without touching its files.
     static func start(completion: @escaping (_ ok: Bool, _ message: String?) -> Void) {
         let script = """
         launchctl kickstart -k system/com.jg.FanCTL.daemon
@@ -91,7 +91,7 @@ enum PrivilegedInstaller {
         runAsRoot(script: script, completion: completion)
     }
 
-    /// Detiene el daemon y elimina el plist y el binario instalados.
+    /// Stops the daemon and removes the installed plist and binary.
     static func uninstall(completion: @escaping (_ ok: Bool, _ message: String?) -> Void) {
         let script = """
         launchctl bootout system/com.jg.FanCTL.daemon 2>/dev/null || true
@@ -123,7 +123,7 @@ enum PrivilegedInstaller {
                 try process.run()
             } catch {
                 DispatchQueue.main.async {
-                    completion(false, "No se pudo ejecutar la instalación: \(error.localizedDescription)")
+                    completion(false, "Unable to run the installation: \(error.localizedDescription)")
                 }
                 return
             }
@@ -138,7 +138,7 @@ enum PrivilegedInstaller {
                     completion(true, output)
                 } else {
                     let message = errorText.isEmpty
-                        ? "La instalación no se completó (código \(process.terminationStatus))."
+                        ? "The installation did not complete (code \(process.terminationStatus))."
                         : errorText
                     completion(false, message)
                 }

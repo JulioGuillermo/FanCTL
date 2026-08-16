@@ -1,6 +1,6 @@
 import Foundation
 
-// Punto de entrada del daemon. Se mantiene vivo para servir conexiones XPC.
+// Daemon entry point. Stays alive to serve XPC connections.
 let service = DaemonService()
 service.start()
 RunLoop.main.run()

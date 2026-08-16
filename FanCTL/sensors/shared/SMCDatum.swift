@@ -1,13 +1,13 @@
 import Foundation
 
-/// Datos crudos devueltos por el SMC al leer una clave (ej. "F0Ac", "Tp01").
+/// Raw data returned by the SMC when reading a key (e.g. "F0Ac", "Tp01").
 struct SMCDatum {
-    /// Bytes de datos leídos (ya recortados al tamaño reportado por `size`).
+    /// Data bytes read (already trimmed to the size reported by `size`).
     let bytes: [UInt8]
 
-    /// Tipo de dato reportado por el SMC como fourCC (ej. "flt ", "ui8 ", "sp78").
+    /// Data type reported by the SMC as a fourCC (e.g. "flt ", "ui8 ", "sp78").
     let type: String
 
-    /// Tamaño en bytes de los datos.
+    /// Size in bytes of the data.
     let size: UInt32
 }

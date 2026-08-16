@@ -1,8 +1,8 @@
 import Foundation
 
-/// Utilidades para codificar/decodificar claves FourCC del SMC ("FNum" <-> 0x464E756D).
+/// Utilities to encode/decode SMC FourCC keys ("FNum" <-> 0x464E756D).
 enum FourCharCode {
-    /// Convierte un string de hasta 4 caracteres ASCII en su valor `UInt32` (big-endian).
+    /// Converts a string of up to 4 ASCII characters into its `UInt32` value (big-endian).
     static func fromString(_ str: String) -> UInt32 {
         var result: UInt32 = 0
         for byte in str.utf8.prefix(4) {
@@ -11,7 +11,7 @@ enum FourCharCode {
         return result
     }
 
-    /// Convierte un valor `UInt32` en su representación ASCII de 4 caracteres.
+    /// Converts a `UInt32` value into its 4-character ASCII representation.
     static func toString(_ code: UInt32) -> String {
         let bytes = [
             UInt8((code >> 24) & 0xFF),

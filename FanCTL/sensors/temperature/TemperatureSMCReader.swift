@@ -1,13 +1,13 @@
 import Foundation
 
-/// Escáner de sensores de temperatura leídos directamente por clave SMC.
+/// Temperature sensor scanner reading directly by SMC key.
 ///
-/// Recorre un conjunto de claves conocidas de los Macs Apple Silicon y
-/// devuelve los sensores encontrados con su categoría y metadatos.
+/// Iterates over a set of known keys of Apple Silicon Macs and
+/// returns the sensors found with their category and metadata.
 final class TemperatureSMCReader {
     private let client: SMCClient
 
-    /// Claves típicas de temperatura en Macs Apple Silicon.
+    /// Typical temperature keys on Apple Silicon Macs.
     private let knownKeys: [String] = [
         "Tp01", "Tp05", "Tp09", "Tp0D", "Tp0H", "Tp0T", "Tp0P",
         "TG0b", "TG0d", "TG0P",
@@ -20,8 +20,8 @@ final class TemperatureSMCReader {
         self.client = client
     }
 
-    /// Lee todas las claves conocidas y devuelve los sensores encontrados.
-    /// - Returns: Tupla con la lista de sensores y si la conexión SMC funcionó.
+    /// Reads all known keys and returns the sensors found.
+    /// - Returns: tuple with the sensor list and whether the SMC connection worked.
     func readSensors() -> (sensors: [SensorInfo], connectionOk: Bool) {
         guard client.open() else { return ([], false) }
         defer { client.close() }
@@ -42,7 +42,7 @@ final class TemperatureSMCReader {
                 thermalZone: "AppleSMC Subsystem",
                 usagePage: nil,
                 usage: nil,
-                descriptionText: "Lectura directa por clave de registro de firmware AppleSMC (\(keyName))."
+                descriptionText: "Direct reading by AppleSMC firmware register key (\(keyName))."
             ))
         }
 

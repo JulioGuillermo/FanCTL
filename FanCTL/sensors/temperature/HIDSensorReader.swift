@@ -1,13 +1,13 @@
 import Foundation
 import IOKit
 
-/// Escáner de sensores de temperatura expuestos por la interfaz IOHID
-/// (ThermalZone) de los Macs Apple Silicon.
+/// Temperature sensor scanner exposed by the IOHID interface
+/// (ThermalZone) of Apple Silicon Macs.
 ///
-/// Enlaza dinámicamente los símbolos de `IOHIDEventSystemClient*` y
-/// `IOHIDServiceClient*` para consultar los servicios térmicos HID.
+/// Dynamically links the `IOHIDEventSystemClient*` and
+/// `IOHIDServiceClient*` symbols to query the HID thermal services.
 final class HIDSensorReader {
-    /// Devuelve la lista de sensores térmicos reportados por IOHID.
+    /// Returns the thermal sensor list reported by IOHID.
     func readSensors() -> [SensorInfo] {
         var hidSensors: [SensorInfo] = []
 
@@ -19,7 +19,7 @@ final class HIDSensorReader {
         typealias IOHIDServiceClientCopyProperty = @convention(c) (OpaquePointer, CFString) -> CFTypeRef?
 
         guard let handle = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_NOW) else {
-            AppLog.log("[HIDSensorReader] Error: No se pudo abrir IOKit.framework")
+            AppLog.log("[HIDSensorReader] Error: could not open IOKit.framework")
             return hidSensors
         }
         defer { dlclose(handle) }
@@ -30,7 +30,7 @@ final class HIDSensorReader {
               let copyEventSym = dlsym(handle, "IOHIDServiceClientCopyEvent"),
               let getFloatValueSym = dlsym(handle, "IOHIDEventGetFloatValue"),
               let copyPropSym = dlsym(handle, "IOHIDServiceClientCopyProperty") else {
-            AppLog.log("[HIDSensorReader] Error: No se pudieron vincular símbolos IOHID")
+            AppLog.log("[HIDSensorReader] Error: could not link IOHID symbols")
             return hidSensors
         }
 
@@ -64,7 +64,7 @@ final class HIDSensorReader {
                 guard let serviceRaw = CFArrayGetValueAtIndex(services, i) else { continue }
                 let service = OpaquePointer(serviceRaw)
 
-                // Extraer metadatos de las propiedades de IOKit
+                // Extract metadata from the IOKit properties
                 let productProp = serviceCopyProperty(service, "Product" as CFString) as? String
                 let nameProp = serviceCopyProperty(service, "PrimaryUsageName" as CFString) as? String
                 let zoneProp = serviceCopyProperty(service, "ThermalZone" as CFString) as? String
@@ -105,7 +105,7 @@ final class HIDSensorReader {
                             descriptionText: SensorDescriptions.description(for: rawName, category: category)
                         )
 
-                        // Evitar duplicados por nombre
+                        // Avoid duplicates by name
                         if !hidSensors.contains(where: { $0.rawKey == rawName }) {
                             hidSensors.append(info)
                         }

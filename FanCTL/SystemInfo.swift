@@ -1,7 +1,7 @@
 import Foundation
 import SystemConfiguration
 
-/// Tipo de equipo Mac detectado desde el identificador del modelo.
+/// Mac machine type detected from the model identifier.
 enum MacType: String {
     case macMini = "Mac mini"
     case macStudio = "Mac Studio"
@@ -12,7 +12,7 @@ enum MacType: String {
     case macPro = "Mac Pro"
     case unknown = "Mac"
 
-    /// Símbolo SF apropiado para cada tipo de equipo.
+    /// Appropriate SF Symbol for each machine type.
     var iconName: String {
         switch self {
         case .macMini: return "macmini.fill"
@@ -23,16 +23,16 @@ enum MacType: String {
     }
 }
 
-/// Información del equipo detectada del sistema (no hardcodeada).
+/// Machine information detected from the system (not hardcoded).
 struct SystemInfo {
-    /// Nombre visible del equipo (el que el usuario ve en Ajustes del Sistema).
+    /// Visible machine name (the one the user sees in System Settings).
     let computerName: String
-    /// Tipo de Mac (Mac mini, MacBook Pro, Mac Studio, etc.).
+    /// Mac type (Mac mini, MacBook Pro, Mac Studio, etc.).
     let type: MacType
-    /// Identificador de hardware (ej. "Mac15,12").
+    /// Hardware identifier (e.g. "Mac15,12").
     let modelIdentifier: String
 
-    /// Instancia única cacheada (la info no cambia en caliente).
+    /// Cached singleton (the info does not change while running).
     static let shared = SystemInfo.current()
 
     static func current() -> SystemInfo {
@@ -44,7 +44,7 @@ struct SystemInfo {
         )
     }
 
-    /// Identificador de hardware vía `sysctl` ("hw.model").
+    /// Hardware identifier via `sysctl` ("hw.model").
     private static func hardwareModelIdentifier() -> String {
         var size = 0
         sysctlbyname("hw.model", nil, &size, nil, 0)
@@ -54,15 +54,15 @@ struct SystemInfo {
         return String(cString: buffer)
     }
 
-    /// Nombre del equipo desde SystemConfiguration.
+    /// Machine name from SystemConfiguration.
     private static func computerName() -> String {
         guard let name = SCDynamicStoreCopyComputerName(nil, nil) else { return "Mac" }
         return name as String
     }
 
-    /// Deriva el tipo de Mac a partir del identificador de hardware.
-    /// 1º busca en la tabla de modelos Apple Silicon ("MacN,M"), 2º parsea el
-    /// prefijo de los modelos Intel ("MacBookPro*", "Macmini*", etc.).
+    /// Derives the Mac type from the hardware identifier.
+    /// 1. looks up the Apple Silicon model table ("MacN,M"), 2. parses the
+    /// prefix of the Intel models ("MacBookPro*", "Macmini*", etc.).
     private static func macType(for identifier: String) -> MacType {
         if let known = appleSiliconModels[identifier] {
             return known
@@ -77,8 +77,8 @@ struct SystemInfo {
         return .unknown
     }
 
-    /// Tabla de identificadores Apple Silicon conocidos (los identificadores
-    /// "MacN,M" no codifican el tipo en el nombre, así que hay que mapearlos).
+    /// Table of known Apple Silicon identifiers (the identifiers
+    /// "MacN,M" do not encode the type in the name, so they must be mapped).
     private static let appleSiliconModels: [String: MacType] = [
         // Mac mini
         "Macmini9,1": .macMini, // M1 (2020)

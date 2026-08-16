@@ -1,14 +1,14 @@
 import Foundation
 
-/// Estructura completa de información y metadatos de un sensor térmico.
+/// Complete structure of information and metadata of a thermal sensor.
 struct SensorInfo: Identifiable, Hashable {
-    let id: String              // Identificador único (ej. "PMU2 tdie1")
-    let rawKey: String          // Nombre o clave cruda en IOKit/SMC
-    let value: Double           // Lectura en grados Celsius
-    let source: SensorSource    // Origen de la lectura (SMC o HID)
-    let category: SensorCategory// Categoría asignada
-    let thermalZone: String?    // Zona térmica reportada por IOKit (si existe)
+    let id: String              // Unique identifier (e.g. "PMU2 tdie1")
+    let rawKey: String          // Raw name or key in IOKit/SMC
+    let value: Double           // Reading in degrees Celsius
+    let source: SensorSource    // Source of the reading (SMC or HID)
+    let category: SensorCategory// Assigned category
+    let thermalZone: String?    // Thermal zone reported by IOKit (if any)
     let usagePage: Int?         // HID Usage Page (ej. 0xFF00)
-    let usage: Int?             // HID Usage (ej. 5 para Temperatura)
-    let descriptionText: String // Explicación técnica del sensor
+    let usage: Int?             // HID Usage (e.g. 5 for Temperature)
+    let descriptionText: String // Technical explanation of the sensor
 }

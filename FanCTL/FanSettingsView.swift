@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Hoja de configuración de un ventilador: rango de temperatura a mantener
-/// y selección de qué sensores lo controlan.
+/// Configuration sheet for a single fan: temperature range to maintain and
+/// which sensors control it.
 struct FanSettingsView: View {
     let fan: FanInfo
     let sensors: [SensorInfo]
@@ -32,7 +32,7 @@ struct FanSettingsView: View {
                     .font(.title)
                     .foregroundColor(.blue)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Ajustes del ventilador")
+                    Text("Fan settings")
                         .font(.title2)
                         .bold()
                     Text(fan.name)
@@ -40,17 +40,17 @@ struct FanSettingsView: View {
                         .foregroundColor(.secondary)
                 }
                 Spacer()
-                Button("Cerrar") { dismiss() }
+                Button("Close") { dismiss() }
             }
 
             Divider()
 
-            // Modo de control
+            // Control mode
             VStack(alignment: .leading, spacing: 8) {
-                Text("Modo de control")
+                Text("Control mode")
                     .font(.headline)
 
-                Picker("Modo", selection: $config.mode) {
+                Picker("Mode", selection: $config.mode) {
                     ForEach(FanMode.allCases, id: \.self) { candidate in
                         Label(candidate.rawValue, systemImage: candidate.iconName)
                             .tag(candidate)
@@ -61,18 +61,18 @@ struct FanSettingsView: View {
 
                 switch config.mode {
                 case .automatic:
-                    Text("Velocidad calculada a partir de la temperatura máxima de los sensores seleccionados.")
+                    Text("Speed calculated from the maximum temperature of the selected sensors.")
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 case .manual:
                     manualSpeedSection
                         .padding(.top, 4)
                 case .off:
-                    Text("Ventilador fijado a la velocidad mínima (los ventiladores no pueden apagarse del todo).")
+                    Text("Fan fixed to the minimum speed (fans cannot be fully turned off).")
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 case .maximum:
-                    Text("Ventilador fijado a la velocidad máxima.")
+                    Text("Fan fixed to the maximum speed.")
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
@@ -80,16 +80,16 @@ struct FanSettingsView: View {
 
             Divider()
 
-            // Rango de velocidad configurable (aplica a todos los modos)
+            // Configurable speed range (applies to all modes)
             VStack(alignment: .leading, spacing: 8) {
-                Toggle("Limitar rango de velocidad", isOn: isCustomRangeBinding)
+                Toggle("Limit speed range", isOn: isCustomRangeBinding)
                     .font(.headline)
 
                 if config.minRPM != nil || config.maxRPM != nil {
-                    speedRangeRow(label: "Vel. mínima (RPM)", value: minRPMBinding)
-                    speedRangeRow(label: "Vel. máxima (RPM)", value: maxRPMBinding)
+                    speedRangeRow(label: "Min speed (RPM)", value: minRPMBinding)
+                    speedRangeRow(label: "Max speed (RPM)", value: maxRPMBinding)
 
-                    Text("Dentro del rango real del ventilador: \(Int(fan.minRPM)) – \(Int(fan.maxRPM)) RPM. Útil para alargar la vida del ventilador.")
+                    Text("Within the fan's real range: \(Int(fan.minRPM)) – \(Int(fan.maxRPM)) RPM. Useful to extend the fan's lifespan.")
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
@@ -97,30 +97,30 @@ struct FanSettingsView: View {
 
             Divider()
 
-            // Rango de temperatura a mantener (solo aplica en modo Auto)
+            // Temperature range to maintain (only applies in Auto mode)
             if config.mode == .automatic {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Temperaturas a mantener")
+                    Text("Temperatures to maintain")
                         .font(.headline)
 
-                    temperatureRow(label: "Temp máxima (°C)", value: $config.maxTemperature)
-                    temperatureRow(label: "Temp mínima (°C)", value: $config.minTemperature)
+                    temperatureRow(label: "Max temperature (°C)", value: $config.maxTemperature)
+                    temperatureRow(label: "Min temperature (°C)", value: $config.minTemperature)
 
-                    Text("Por debajo de la mínima la velocidad es mínima; por encima de la máxima, máxima.")
+                    Text("Below the minimum the speed is minimal; above the maximum, maximal.")
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
 
                 Divider()
 
-                // Sensores que controlan este ventilador
+                // Sensors that control this fan
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text("Sensores que controlan este ventilador")
+                        Text("Sensors controlling this fan")
                             .font(.headline)
                         Spacer()
-                        Button("Todo") { selectAll() }
-                        Button("Ninguno") { config.selectedSensorKeys = [] }
+                        Button("All") { selectAll() }
+                        Button("None") { config.selectedSensorKeys = [] }
                     }
                     .font(.caption)
 
@@ -136,7 +136,7 @@ struct FanSettingsView: View {
                         .frame(minHeight: 240, maxHeight: 320)
                         .clipped()
                     } else {
-                        Text("Sin sensores detectados.")
+                        Text("No sensors detected.")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -145,13 +145,13 @@ struct FanSettingsView: View {
 
             Divider()
 
-            // Resumen del cálculo
+            // Calculation summary
             summarySection
         }
         .padding()
         .frame(width: 500)
         .onAppear {
-            // Por defecto, si no hay selección guardada, seleccionar todos los sensores
+            // By default, if there is no saved selection, select all sensors
             if config.selectedSensorKeys.isEmpty && !sensors.isEmpty {
                 config.selectedSensorKeys = sensors.map(\.id)
             }
@@ -177,7 +177,7 @@ struct FanSettingsView: View {
     private var manualSpeedSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("Velocidad fija")
+                Text("Fixed speed")
                     .foregroundColor(.secondary)
                 Spacer()
                 TextField("RPM", value: Binding(
@@ -198,7 +198,7 @@ struct FanSettingsView: View {
                 step: 50
             )
 
-            Text("Rango: \(Int(effMin)) – \(Int(effMax)) RPM (real del ventilador: \(Int(fan.minRPM)) – \(Int(fan.maxRPM)))")
+            Text("Range: \(Int(effMin)) – \(Int(effMax)) RPM (fan's real range: \(Int(fan.minRPM)) – \(Int(fan.maxRPM)))")
                 .font(.caption2)
                 .foregroundColor(.secondary)
         }
@@ -208,16 +208,16 @@ struct FanSettingsView: View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 if config.mode == .automatic {
-                    Text("Sensores: \(selectedCount)/\(sensors.count)")
+                    Text("Sensors: \(selectedCount)/\(sensors.count)")
                         .font(.caption)
                         .foregroundColor(.secondary)
                     if let maxTemp = calculation.maxSelectedTemperature {
-                        Text(String(format: "Máx: %.1f °C", maxTemp))
+                        Text(String(format: "Max: %.1f °C", maxTemp))
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
                 } else {
-                    Text("Modo: \(config.mode.rawValue)")
+                    Text("Mode: \(config.mode.rawValue)")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -225,12 +225,12 @@ struct FanSettingsView: View {
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
                 if config.mode == .automatic {
-                    Text(String(format: "Normalizado: %.0f%%", calculation.normalizedValue * 100))
+                    Text(String(format: "Normalized: %.0f%%", calculation.normalizedValue * 100))
                         .font(.caption)
                         .bold()
                 }
                 if let target = summaryTargetRPM {
-                    Text("Velocidad objetivo: \(Int(target)) RPM")
+                    Text("Target speed: \(Int(target)) RPM")
                         .font(.caption)
                         .bold()
                         .foregroundColor(.blue)
@@ -328,7 +328,7 @@ struct FanSettingsView: View {
     }
 }
 
-/// Fila con checkbox para la selección de sensores dentro de la config de un fan.
+/// Row with checkbox for sensor selection inside a fan's config.
 private struct SensorSelectionRow: View {
     let sensor: SensorInfo
     let isSelected: Bool

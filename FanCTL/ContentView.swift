@@ -10,7 +10,7 @@ struct ContentView: View {
 
     @State private var sensors: [SensorInfo] = []
     @State private var fans: [FanInfo] = []
-    @State private var connectionStatus: String = "No iniciado"
+    @State private var connectionStatus: String = "Not started"
     @State private var isConnected: Bool = false
     @State private var selectedSensor: SensorInfo? = nil
     @State private var settingsFan: FanInfo? = nil
@@ -20,21 +20,22 @@ struct ContentView: View {
 
     @StateObject private var settingsStore = SettingsStore()
 
-    // Ticker de 0.5s para respetar el intervalo configurado de reescaneo
+    // 0.5s ticker to respect the configured rescan interval
     private let ticker = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
 
     var body: some View {
         HStack(spacing: 0) {
-            // Panel Izquierdo (pequeño): Sensores Térmicos en solo lectura
+            // Left panel (small): read-only thermal sensors
             LeftPanelSensorsView(
                 sensors: sensors,
-                selectedSensor: $selectedSensor
+                selectedSensor: $selectedSensor,
+                maxTempSensorKey: settingsStore.settings.maxTempSensorKey
             )
             .frame(minWidth: 330, maxWidth: 380)
 
             Divider()
 
-            // Panel Derecho (expansible): Equipo, Estado y Ventiladores
+            // Right panel (expandable): Machine, Status and Fans
             RightPanelFansView(
                 fans: fans,
                 systemInfo: SystemInfo.shared,
@@ -73,8 +74,8 @@ struct ContentView: View {
             }
         }
         .onChange(of: scenePhase) { _, _ in
-            // Al cerrar la ventana la app se oculta a la barra de menú y el
-            // control continúa. Solo el cierre real (Cmd+Q) restaura el sistema.
+            // When the window is closed the app hides to the menu bar and
+            // control continues. Only real closing (Cmd+Q) restores the system.
         }
         .background(WindowCloseHider())
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
@@ -87,10 +88,10 @@ struct ContentView: View {
             FanSettingsView(fan: fan, sensors: sensors, store: settingsStore)
         }
         .sheet(isPresented: $showingGeneralSettings) {
-            GeneralSettingsView(store: settingsStore, daemon: daemonClient)
+            GeneralSettingsView(store: settingsStore, daemon: daemonClient, sensors: sensors)
         }
         .onReceive(daemonClient.$isAvailable) { available in
-            // Si el daemon pasa a estar disponible (o se cae), recalcular el control
+            // If the daemon becomes available (or goes down), recompute control
             if available {
                 fanController.recheckPrivileges()
                 refreshSensors()
@@ -138,7 +139,7 @@ struct ContentView: View {
         var config = settingsStore.fanSettings(for: fan)
         config.mode = mode
         settingsStore.updateFanSettings(config)
-        AppLog.log("[Content] Fan \(fan.id) modo → \(mode.rawValue)")
+        AppLog.log("[Content] Fan \(fan.id) mode → \(mode.rawValue)")
     }
 
     private func changeManualRPM(_ rpm: Double, for fan: FanInfo) {
@@ -157,7 +158,7 @@ struct ContentView: View {
             let config = settingsStore.fanSettings(for: fan)
             let desired = desiredRPM(for: fan)
             fanController.setSpeed(desired, toFan: fan.id)
-            AppLog.log("[Content] F\(fan.id) modo=\(config.mode.rawValue) objetivo=\(Int(desired)) RPM")
+            AppLog.log("[Content] F\(fan.id) mode=\(config.mode.rawValue) target=\(Int(desired)) RPM")
         }
     }
 
@@ -171,62 +172,87 @@ struct ContentView: View {
     private func refreshSensors() {
         lastRefresh = Date()
         isScanning = true
-        AppLog.log("[Content] refreshSensors() iniciado")
+        AppLog.log("[Content] refreshSensors() started")
 
         let snapshot = SensorsReader().readAll()
         self.sensors = snapshot.sensors
         self.fans = snapshot.fans
         self.isConnected = snapshot.connectionOk
-        self.connectionStatus = snapshot.connectionOk ? "Conectado" : "Error de Conexión"
-        hardwareMonitor.update(sensors: snapshot.sensors, fans: snapshot.fans)
-        AppLog.log("[Content] Sensores totales: \(snapshot.sensors.count), Ventiladores: \(snapshot.fans.count), connectionOk: \(snapshot.connectionOk)")
+        self.connectionStatus = snapshot.connectionOk ? "Connected" : "Connection error"
+        hardwareMonitor.update(
+            sensors: snapshot.sensors,
+            fans: snapshot.fans,
+            maxTempSensorKey: settingsStore.settings.maxTempSensorKey
+        )
+        AppLog.log("[Content] Total sensors: \(snapshot.sensors.count), Fans: \(snapshot.fans.count), connectionOk: \(snapshot.connectionOk)")
 
         isScanning = false
         applyFanControl()
     }
 }
 
-/// Panel izquierdo compacto con la lista de sensores térmicos en solo lectura
+/// Compact left panel with the read-only list of thermal sensors
 struct LeftPanelSensorsView: View {
     let sensors: [SensorInfo]
     @Binding var selectedSensor: SensorInfo?
+    var maxTempSensorKey: String? = nil
+
+    private var maxTempSensor: SensorInfo? {
+        if let key = maxTempSensorKey {
+            return sensors.first { $0.id == key }
+        }
+        return sensors.max { $0.value < $1.value }
+    }
 
     private var maxTempText: String {
-        guard let max = sensors.map(\.value).max() else { return "—" }
-        return String(format: "%.1f °C", max)
+        guard let sensor = maxTempSensor else { return "—" }
+        return String(format: "%.1f °C", sensor.value)
     }
 
     private var maxTempColor: Color {
-        guard let max = sensors.map(\.value).max() else { return .secondary }
-        if max < 45 { return .green }
-        if max < 65 { return .orange }
-        return .red
+        guard let sensor = maxTempSensor else { return .secondary }
+        return TemperatureIndicator.color(for: sensor.value)
+    }
+
+    private var maxTempIcon: String {
+        guard let sensor = maxTempSensor else { return "thermometer.medium" }
+        return TemperatureIndicator.iconName(for: sensor.value)
+    }
+
+    private var maxTempSourceName: String {
+        guard let sensor = maxTempSensor else { return "No data" }
+        return maxTempSensorKey == nil ? "Auto · \(sensor.rawKey)" : sensor.rawKey
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // Encabezado de la Sección de Sensores
+            // Sensor section header
             VStack(alignment: .leading, spacing: 2) {
-                Text("Sensores Térmicos")
+                Text("Thermal sensors")
                     .font(.title3)
                     .bold()
-                Text("Acceso IOKit directo")
+                Text("Direct IOKit access")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
             .padding(.horizontal)
             .padding(.top)
 
-            // Máxima temperatura de todos los sensores
+            // Maximum temperature (from the selected sensor or the hottest)
             HStack {
-                Label(maxTempText, systemImage: "thermometer.high")
-                    .font(.system(.body, design: .monospaced))
-                    .bold()
-                    .foregroundColor(maxTempColor)
+                VStack(alignment: .leading, spacing: 2) {
+                    Label(maxTempText, systemImage: maxTempIcon)
+                        .font(.system(.body, design: .monospaced))
+                        .bold()
+                        .foregroundColor(maxTempColor)
+                    Text(maxTempSourceName)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
 
                 Spacer()
 
-                Text("\(sensors.count) activos")
+                Text("\(sensors.count) active")
                     .font(.caption)
                     .bold()
                     .foregroundColor(.secondary)
@@ -235,7 +261,7 @@ struct LeftPanelSensorsView: View {
 
             Divider()
 
-            // Lista limpia de Sensores Térmicos
+            // Clean thermal sensor list
             if !sensors.isEmpty {
                 List(sensors, id: \.id) { sensor in
                     SensorRowView(
@@ -251,9 +277,9 @@ struct LeftPanelSensorsView: View {
                     Image(systemName: "thermometer.medium")
                         .font(.system(size: 40))
                         .foregroundColor(.secondary)
-                    Text("Sin datos de sensores")
+                    Text("No sensor data")
                         .font(.headline)
-                    Text("Esperando la primera lectura del hardware.")
+                    Text("Waiting for the first hardware read.")
                         .font(.caption)
                         .foregroundColor(.gray)
                     Spacer()
@@ -265,7 +291,7 @@ struct LeftPanelSensorsView: View {
     }
 }
 
-/// Panel derecho principal y expansible con el equipo, el estado y los ventiladores
+/// Main expandable right panel with the machine, status and fans
 struct RightPanelFansView: View {
     let fans: [FanInfo]
     let systemInfo: SystemInfo
@@ -287,7 +313,7 @@ struct RightPanelFansView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Encabezado del Panel con el equipo real detectado
+            // Panel header with the detected machine
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     HStack(spacing: 10) {
@@ -312,10 +338,10 @@ struct RightPanelFansView: View {
                             .foregroundColor(.secondary)
                     }
                     .buttonStyle(.plain)
-                    .help("Ajustes generales")
+                    .help("General settings")
                 }
 
-                // Indicador de Estado
+                // Status indicator
                 HStack(spacing: 8) {
                     Circle()
                         .fill(isConnected ? Color.green : Color.red)
@@ -327,7 +353,7 @@ struct RightPanelFansView: View {
                     Spacer()
 
                     if controlActive {
-                        Text("Control activo")
+                        Text("Control active")
                             .font(.caption2)
                             .bold()
                             .padding(.horizontal, 6)
@@ -336,7 +362,7 @@ struct RightPanelFansView: View {
                             .foregroundColor(.blue)
                             .cornerRadius(4)
                     } else {
-                        Text("Control requiere root")
+                        Text("Control requires root")
                             .font(.caption2)
                             .bold()
                             .padding(.horizontal, 6)
@@ -352,21 +378,21 @@ struct RightPanelFansView: View {
 
             Divider()
 
-            // Banner de permisos: pide activar el control del ventilador
+            // Permission banner: asks to enable fan control
             if !controlActive {
                 HStack(spacing: 10) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundColor(.orange)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Control del ventilador desactivado")
+                        Text("Fan control disabled")
                             .font(.caption)
                             .bold()
-                        Text("El control en background necesita permisos de administrador.")
+                        Text("Background control requires administrator privileges.")
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }
                     Spacer()
-                    Button("Iniciar control") { onRequestControl() }
+                    Button("Start control") { onRequestControl() }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.small)
                         .disabled(isRequestingPermissions)
@@ -388,7 +414,7 @@ struct RightPanelFansView: View {
                     HStack(spacing: 8) {
                         ProgressView()
                             .controlSize(.small)
-                        Text("Solicitando permisos de administrador…")
+                        Text("Requesting administrator privileges…")
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }
@@ -396,7 +422,7 @@ struct RightPanelFansView: View {
                 }
             }
 
-            // Lista de Ventiladores (ocupa todo el espacio disponible)
+            // Fan list (takes all available space)
             if !fans.isEmpty {
                 ScrollView {
                     VStack(spacing: 12) {
@@ -420,16 +446,16 @@ struct RightPanelFansView: View {
                     .padding(.horizontal)
                 }
             } else {
-                // Estado para Macs Fanless (ej. MacBook Air)
+                // State for fanless Macs (e.g. MacBook Air)
                 VStack(spacing: 12) {
                     Spacer()
                     Image(systemName: "wind")
                         .font(.system(size: 36))
                         .foregroundColor(.secondary.opacity(0.6))
-                    Text("Sin ventiladores")
+                    Text("No fans")
                         .font(.headline)
                         .foregroundColor(.secondary)
-                    Text("Este equipo utiliza refrigeración pasiva o no reporta ventiladores.")
+                    Text("This machine uses passive cooling or does not report fans.")
                         .font(.caption)
                         .multilineTextAlignment(.center)
                         .foregroundColor(.secondary.opacity(0.8))
@@ -445,7 +471,7 @@ struct RightPanelFansView: View {
     }
 }
 
-/// Fila individual para cada sensor térmico (solo lectura)
+/// Individual row for each thermal sensor (read-only)
 struct SensorRowView: View {
     let sensor: SensorInfo
     var onTapDetails: () -> Void = {}
@@ -489,7 +515,7 @@ struct SensorRowView: View {
     }
 }
 
-/// Modal de inspección completa de metadatos de IOKit
+/// Full IOKit metadata inspection modal
 struct SensorDetailView: View {
     let sensor: SensorInfo
     @Environment(\.dismiss) var dismiss
@@ -504,16 +530,16 @@ struct SensorDetailView: View {
                     .font(.title2)
                     .bold()
                 Spacer()
-                Button("Cerrar") { dismiss() }
+                Button("Close") { dismiss() }
             }
 
             Divider()
 
             Group {
-                MetaRow(label: "Temperatura Actual", value: String(format: "%.2f °C", sensor.value))
-                MetaRow(label: "Categoría", value: sensor.category.rawValue)
-                MetaRow(label: "Origen (API)", value: sensor.source.rawValue)
-                MetaRow(label: "Zona Térmica (ThermalZone)", value: sensor.thermalZone ?? "N/A")
+                MetaRow(label: "Current Temperature", value: String(format: "%.2f °C", sensor.value))
+                MetaRow(label: "Category", value: sensor.category.rawValue)
+                MetaRow(label: "Source (API)", value: sensor.source.rawValue)
+                MetaRow(label: "Thermal Zone", value: sensor.thermalZone ?? "N/A")
 
                 if let up = sensor.usagePage {
                     MetaRow(label: "PrimaryUsagePage", value: String(format: "0x%04X", up))
@@ -525,7 +551,7 @@ struct SensorDetailView: View {
 
             Divider()
 
-            Text("Explicación del Sensor")
+            Text("Sensor explanation")
                 .font(.headline)
 
             Text(sensor.descriptionText)

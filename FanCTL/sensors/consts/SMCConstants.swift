@@ -1,27 +1,27 @@
 import Foundation
 
-/// Constantes del protocolo de comunicación con AppleSMC.
+/// Constants of the AppleSMC communication protocol.
 ///
-/// IMPORTANTE: deben coincidir con los valores definidos en
-/// `TemperatureBridge.h` (selector del método externo, comandos y códigos
-/// de resultado). Se centralizan aquí en Swift para evitar la ambigüedad
-/// que se producía al redefinir los mismos nombres que el header C.
+/// IMPORTANT: they must match the values defined in
+/// `TemperatureBridge.h` (external method selector, commands and
+/// result codes). They are centralized here in Swift to avoid the ambiguity
+/// that arose from redefining the same names as the C header.
 enum SMCConstants {
-    /// Selector de método externo usado por `IOConnectCallStructMethod`.
+    /// External method selector used by `IOConnectCallStructMethod`.
     static let kernelIndex: UInt32 = 2
 
-    /// Comando SMC para leer los datos de una clave (tras `GET_KEY_INFO`).
+    /// SMC command to read a key's data (after `GET_KEY_INFO`).
     static let commandReadBytes: UInt8 = 5
 
-    /// Comando SMC para escribir los datos de una clave.
+    /// SMC command to write a key's data.
     static let commandWriteBytes: UInt8 = 6
 
-    /// Comando SMC para obtener la información de una clave (tamaño y tipo).
+    /// SMC command to get a key's information (size and type).
     static let commandGetKeyInfo: UInt8 = 9
 
-    /// Comando SMC para recorrer el índice de claves por posición.
+    /// SMC command to iterate the key index by position.
     static let commandReadIndex: UInt8 = 8
 
-    /// Resultado de éxito devuelto por el SMC.
+    /// Success result returned by the SMC.
     static let success: UInt8 = 0
 }

@@ -1,8 +1,8 @@
 import Foundation
 import IOKit
 
-/// Logger mínimo a archivo para el daemon (corre como root, así que no puede
-/// usar ~/Library del usuario). Escribe en /Library/Logs/FanCTL/fanctl-daemon.log
+/// Minimal file logger for the daemon (runs as root, so it cannot use the
+/// user's ~/Library). Writes to /Library/Logs/FanCTL/fanctl-daemon.log
 enum DaemonLog {
     private static let fileURL: URL = {
         let dir = URL(fileURLWithPath: "/Library/Logs/FanCTL", isDirectory: true)
@@ -28,42 +28,42 @@ enum DaemonLog {
     }
 }
 
-/// Cliente de bajo nivel de AppleSMC para escritura (modo manual + velocidad).
+/// Low-level AppleSMC client for writing (manual mode + speed).
 ///
-/// Es una versión reducida de `SMCClient` de la app: solo necesita el camino
-/// de escritura (GET_KEY_INFO → WRITE_BYTES) y un log propio, sin depender del
-/// resto del proyecto.
+/// It is a reduced version of the app's `SMCClient`: it only needs the
+/// write path (GET_KEY_INFO → WRITE_BYTES) and its own log, without depending on the
+/// rest of the project.
 final class DaemonSMCClient {
     private var connection: io_connect_t = 0
 
-    /// Selector del método externo de AppleSMC.
+    /// AppleSMC external method selector.
     private let kernelIndex: UInt32 = 2
 
-    /// Comando SMC de escritura (no definido en TemperatureBridge.h).
+    /// SMC write command (not defined in TemperatureBridge.h).
     private let commandWriteBytes: UInt8 = 6
 
-    /// Abre la conexión con el servicio AppleSMC.
+    /// Opens the connection to the AppleSMC service.
     @discardableResult
     func open() -> Bool {
         guard connection == 0 else { return true }
 
         let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSMC"))
         guard service != 0 else {
-            DaemonLog.log("[DaemonSMCClient] Error: No se encontró el servicio AppleSMC.")
+            DaemonLog.log("[DaemonSMCClient] Error: AppleSMC service not found.")
             return false
         }
         defer { IOObjectRelease(service) }
 
         let result = IOServiceOpen(service, mach_task_self_, 0, &connection)
         if result != kIOReturnSuccess {
-            DaemonLog.log("[DaemonSMCClient] IOServiceOpen falló: \(String(format: "0x%08x", result))")
+            DaemonLog.log("[DaemonSMCClient] IOServiceOpen failed: \(String(format: "0x%08x", result))")
             connection = 0
             return false
         }
         return true
     }
 
-    /// Cierra la conexión con AppleSMC si estaba abierta.
+    /// Closes the AppleSMC connection if it was open.
     func close() {
         if connection != 0 {
             IOServiceClose(connection)
@@ -71,44 +71,44 @@ final class DaemonSMCClient {
         }
     }
 
-    /// Fija un ventilador a la velocidad indicada (Apple Silicon: clave `F{N}Tg`).
-    /// - Returns: `true` si la escritura de velocidad se completó.
+    /// Sets a fan to the given speed (Apple Silicon: key `F{N}Tg`).
+    /// - Returns: `true` if the speed write completed.
     func setFanSpeed(fanIndex: Int, rpm: Double) -> Bool {
         let key = "F\(fanIndex)"
-        // Modo manual: ayuda a fijar el valor, pero puede ser rechazado (error 130)
-        // en Apple Silicon; no es bloqueante.
+        // Manual mode: helps to fix the value, but may be rejected (error 130)
+        // on Apple Silicon; it is non-blocking.
         if writeKey(key + "Md", bytes: [1]) {
-            DaemonLog.log("[DaemonSMCClient] F\(fanIndex) modo manual OK")
+            DaemonLog.log("[DaemonSMCClient] F\(fanIndex) manual mode OK")
         } else {
-            DaemonLog.log("[DaemonSMCClient] F\(fanIndex) modo manual rechazado (no bloqueante)")
+            DaemonLog.log("[DaemonSMCClient] F\(fanIndex) manual mode rejected (non-blocking)")
         }
         let fltBytes = withUnsafeBytes(of: Float(rpm)) { Array($0) }
         if writeKey(key + "Tg", bytes: fltBytes) {
             return true
         }
-        DaemonLog.log("[DaemonSMCClient] No se pudo escribir la velocidad en \(key)Tg.")
+        DaemonLog.log("[DaemonSMCClient] Could not write the speed to \(key)Tg.")
         return false
     }
 
-    /// Devuelve un ventilador al control del sistema (modo automático).
-    /// En Apple Silicon el modo automático se observa como `F{N}Md = 3`.
+    /// Returns a fan to system control (automatic mode).
+    /// On Apple Silicon automatic mode is observed as `F{N}Md = 3`.
     func restoreSystemControl(fanIndex: Int) -> Bool {
         let key = "F\(fanIndex)"
         if writeKey(key + "Md", bytes: [0]) {
             return true
         }
-        DaemonLog.log("[DaemonSMCClient] F\(fanIndex) auto=0 rechazado, probando auto=3")
+        DaemonLog.log("[DaemonSMCClient] F\(fanIndex) auto=0 rejected, trying auto=3")
         return writeKey(key + "Md", bytes: [3])
     }
 
-    /// Diagnóstico: vuelca las claves conocidas del ventilador 0.
+    /// Diagnostics: dumps the known keys of fan 0.
     func dumpFanKeys() {
         for suffix in ["Md", "Mn", "Ac", "Tg"] {
             let key = "F0" + suffix
             if let info = keyInfo(key) {
                 DaemonLog.log("[DaemonSMCClient] \(key): dataSize=\(info.dataSize) type=\(typeString(info.dataType))")
             } else {
-                DaemonLog.log("[DaemonSMCClient] \(key): GET_KEY_INFO falló o dataSize=0")
+                DaemonLog.log("[DaemonSMCClient] \(key): GET_KEY_INFO failed or dataSize=0")
             }
         }
     }
@@ -133,7 +133,7 @@ final class DaemonSMCClient {
         return (dataSize, outputInfo.keyInfo.dataType)
     }
 
-    /// Escribe datos crudos en una clave del SMC (ej. "F0Md", "F0Mn").
+    /// Writes raw data to an SMC key (e.g. "F0Md", "F0Mn").
     @discardableResult
     func writeKey(_ key: String, bytes: [UInt8]) -> Bool {
         let keyCode = UInt32(smcKey: key)
@@ -148,7 +148,7 @@ final class DaemonSMCClient {
 
         let dataSize = Int(outputInfo.keyInfo.dataSize)
         guard dataSize > 0 else {
-            DaemonLog.log("[DaemonSMCClient] \(key): GET_KEY_INFO ok pero dataSize=0")
+            DaemonLog.log("[DaemonSMCClient] \(key): GET_KEY_INFO ok but dataSize=0")
             return false
         }
 
@@ -167,7 +167,7 @@ final class DaemonSMCClient {
         if callStruct(input: &inputWrite, output: &outputWrite) {
             return true
         }
-        DaemonLog.log("[DaemonSMCClient] \(key): escritura rechazada (result=\(outputWrite.result), dataSize=\(dataSize))")
+        DaemonLog.log("[DaemonSMCClient] \(key): write rejected (result=\(outputWrite.result), dataSize=\(dataSize))")
         return false
     }
 
@@ -184,7 +184,7 @@ final class DaemonSMCClient {
             &outputSize
         )
         if result != kIOReturnSuccess {
-            DaemonLog.log("[DaemonSMCClient] callSMC falló: kr=\(String(format: "0x%08x", result))")
+            DaemonLog.log("[DaemonSMCClient] callSMC failed: kr=\(String(format: "0x%08x", result))")
             return false
         }
         return output.result == UInt8(kSMCSuccess)
@@ -192,7 +192,7 @@ final class DaemonSMCClient {
 }
 
 private extension UInt32 {
-    /// Convierte una clave de 4 caracteres (ej. "F0Md") en su representación de 32 bits.
+    /// Converts a 4-character key (e.g. "F0Md") into its 32-bit representation.
     init(smcKey: String) {
         var value: UInt32 = 0
         for (i, char) in smcKey.prefix(4).utf8.enumerated() {

@@ -2,19 +2,19 @@ import Foundation
 import ServiceManagement
 internal import Combine
 
-/// Cliente del daemon privilegiado de FanCTL.
+/// FanCTL privileged daemon client.
 ///
-/// Conecta con el mach service `com.jg.FanCTL.daemon` y expone el control
-/// remoto del ventilador cuando el daemon está instalado y corriendo como root.
+/// Connects to the `com.jg.FanCTL.daemon` mach service and exposes remote
+/// fan control when the daemon is installed and running as root.
 ///
-/// Todo el control de instalación/inicio/parada se reduce a un único método:
-/// `toggle()`, que decide según el estado real del daemon:
-/// - no instalado → lo instala (pide contraseña de administrador);
-/// - instalado pero parado → lo arranca;
-/// - corriendo → lo detiene.
+/// All install/start/stop control is reduced to a single method:
+/// `toggle()`, which decides based on the real daemon state:
+/// - not installed → installs it (asks for the administrator password);
+/// - installed but stopped → starts it;
+/// - running → stops it.
 final class FanDaemonClient: ObservableObject {
     static let machServiceName = "com.jg.FanCTL.daemon"
-    /// Nombre del plist dentro de `Contents/Library/LaunchDaemons` del bundle.
+    /// Plist name inside the bundle's `Contents/Library/LaunchDaemons`.
     static let plistName = "com.jg.FanCTL.daemon.plist"
 
     @Published private(set) var isAvailable = false
@@ -32,8 +32,8 @@ final class FanDaemonClient: ObservableObject {
         startHeartbeat()
     }
 
-    /// Sondea el daemon periódicamente para recuperar la conexión aunque se
-    /// pierda algún ping inicial.
+    /// Periodically pings the daemon to recover the connection even if
+    /// an initial ping is lost.
     private func startHeartbeat() {
         heartbeatTimer?.invalidate()
         let timer = Timer(timeInterval: 5, repeats: true) { [weak self] _ in
@@ -44,8 +44,8 @@ final class FanDaemonClient: ObservableObject {
         heartbeatTimer = timer
     }
 
-    /// Lee el estado de instalación del daemon en launchd, combinando el
-    /// registro vía SMAppService y la instalación clásica en
+    /// Reads the daemon installation state in launchd, combining the
+    /// SMAppService registration and the classic installation in
     /// `/Library/LaunchDaemons`.
     func refreshStatus() {
         let smStatus = SMAppService.daemon(plistName: Self.plistName).status
@@ -57,10 +57,10 @@ final class FanDaemonClient: ObservableObject {
         }
     }
 
-    // MARK: - Botón único: Iniciar / Detener
+    // MARK: - Single button: Start / Stop
 
-    /// Instala, arranca o detiene el daemon según su estado actual.
-    /// Pide contraseña de administrador solo cuando hace falta (instalar/arrancar).
+    /// Installs, starts or stops the daemon according to its current state.
+    /// Only asks for the administrator password when needed (install/start).
     func toggle() {
         refreshStatus()
         if isAvailable {
@@ -70,25 +70,25 @@ final class FanDaemonClient: ObservableObject {
         startDaemon()
     }
 
-    /// Instala (si hace falta) y arranca el daemon como root. Si ya está
-    /// instalado y corriendo, solo reconecta.
+    /// Installs (if needed) and starts the daemon as root. If it is already
+    /// installed and running, it only reconnects.
     func startDaemon() {
         refreshStatus()
         guard !isRequestingPermissions else { return }
         isRequestingPermissions = true
         lastError = nil
         stopRequested = false
-        AppLog.log("[DaemonClient] Arrancando/instalando el daemon…")
+        AppLog.log("[DaemonClient] Starting/installing the daemon…")
 
         if daemonStatus == .enabled {
-            // Ya instalado: basta con arrancar el servicio y conectar.
+            // Already installed: just start the service and connect.
             PrivilegedInstaller.start(completion: completion)
         } else {
             PrivilegedInstaller.install(completion: completion)
         }
     }
 
-    /// Detiene el daemon vía XPC (no pide contraseña).
+    /// Stops the daemon via XPC (no password needed).
     func stopDaemon() {
         stopRequested = true
         isRequestingPermissions = false
@@ -109,8 +109,8 @@ final class FanDaemonClient: ObservableObject {
         }
     }
 
-    /// Desinstala el daemon de launchd (pide contraseña de administrador) y
-    /// corta la conexión.
+    /// Uninstalls the daemon from launchd (asks for the administrator password) and
+    /// cuts the connection.
     func uninstallDaemon() {
         stopRequested = true
         isRequestingPermissions = false
@@ -120,7 +120,7 @@ final class FanDaemonClient: ObservableObject {
         try? SMAppService.daemon(plistName: Self.plistName).unregister()
         PrivilegedInstaller.uninstall { [weak self] ok, message in
             DispatchQueue.main.async {
-                self?.lastError = ok ? nil : (message ?? "No se pudo desinstalar el daemon.")
+                self?.lastError = ok ? nil : (message ?? "Could not uninstall the daemon.")
                 self?.refreshStatus()
             }
         }
@@ -137,17 +137,17 @@ final class FanDaemonClient: ObservableObject {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
                     guard let self else { return }
                     if !self.isAvailable {
-                        self.lastError = "El daemon no responde tras arrancar. Revisa /Library/Logs/FanCTL/fanctl-daemon.log"
+                        self.lastError = "daemon does not respond after starting. Check /Library/Logs/FanCTL/fanctl-daemon.log"
                     }
                 }
             }
         } else {
-            lastError = message ?? "No se pudo completar la operación con el daemon."
+            lastError = message ?? "Could not complete the operation with the daemon."
             refreshStatus()
         }
     }
 
-    // MARK: - Conexión XPC
+    // MARK: - XPC connection
 
     private func connect() {
         connection?.invalidate()
@@ -155,7 +155,7 @@ final class FanDaemonClient: ObservableObject {
         let connection = NSXPCConnection(machServiceName: Self.machServiceName, options: .privileged)
         connection.remoteObjectInterface = NSXPCInterface(with: FanDaemonProtocol.self)
         connection.interruptionHandler = { [weak self] in
-            // El daemon se cayó. Si no se pidió detenerlo, reintentar conectarse.
+            // The daemon went down. If stopping was not requested, retry connecting.
             DispatchQueue.main.async {
                 guard let self, !self.stopRequested else { return }
                 self.connection?.invalidate()
@@ -173,8 +173,8 @@ final class FanDaemonClient: ObservableObject {
         self.connection = connection
         connection.resume()
 
-        // Esperar a que la conexión XPC se establezca antes del primer ping;
-        // llamar a métodos inmediatamente tras resume() puede fallar.
+        // Wait for the XPC connection to be established before the first ping;
+        // calling methods right after resume() can fail.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
             self?.ping()
         }
@@ -190,17 +190,17 @@ final class FanDaemonClient: ObservableObject {
         }
     }
 
-    // MARK: - Control del ventilador (XPC)
+    // MARK: - Fan control (XPC)
 
     func setFanSpeed(fanIndex: Int, rpm: Double, completion: @escaping (Bool) -> Void) {
         guard let proxy = proxy() else {
-            AppLog.log("[DaemonClient] setFanSpeed F\(fanIndex) cancelado: sin proxy XPC")
+            AppLog.log("[DaemonClient] setFanSpeed F\(fanIndex) cancelled: no XPC proxy")
             completion(false)
             return
         }
-        AppLog.log("[DaemonClient] Enviando setFanSpeed F\(fanIndex)=\(Int(rpm)) por XPC")
+        AppLog.log("[DaemonClient] Sending setFanSpeed F\(fanIndex)=\(Int(rpm)) via XPC")
         proxy.setFanSpeed(fanIndex: fanIndex, rpm: rpm) { ok in
-            AppLog.log("[DaemonClient] Respuesta setFanSpeed F\(fanIndex)=\(Int(rpm)) -> \(ok)")
+            AppLog.log("[DaemonClient] Response setFanSpeed F\(fanIndex)=\(Int(rpm)) -> \(ok)")
             DispatchQueue.main.async { completion(ok) }
         }
     }
@@ -218,7 +218,7 @@ final class FanDaemonClient: ObservableObject {
     private func proxy() -> FanDaemonProtocol? {
         connection?.remoteObjectProxyWithErrorHandler { [weak self] error in
             DispatchQueue.main.async {
-                AppLog.log("[DaemonClient] Error del proxy XPC: \(error.localizedDescription)")
+                AppLog.log("[DaemonClient] XPC proxy error: \(error.localizedDescription)")
                 self?.isAvailable = false
                 self?.lastError = error.localizedDescription
             }

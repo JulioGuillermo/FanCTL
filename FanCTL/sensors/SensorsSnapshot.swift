@@ -1,13 +1,13 @@
 import Foundation
 
-/// Snapshot completo del estado térmico y de ventilación del equipo.
+/// Complete snapshot of the machine's thermal and fan state.
 struct SensorsSnapshot {
-    /// Todos los sensores de temperatura detectados (SMC + HID).
+    /// All detected temperature sensors (SMC + HID).
     let sensors: [SensorInfo]
 
-    /// Lista completa de ventiladores con sus métricas.
+    /// Complete fan list with its metrics.
     let fans: [FanInfo]
 
-    /// Indica si al menos un origen (SMC o HID) respondió correctamente.
+    /// Indicates whether at least one source (SMC or HID) responded correctly.
     let connectionOk: Bool
 }

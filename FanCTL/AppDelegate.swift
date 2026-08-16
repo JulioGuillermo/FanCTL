@@ -1,20 +1,20 @@
 import AppKit
 import SwiftUI
 
-/// Mantiene la app viva en la barra de menú cuando se cierra la ventana
-/// principal, de modo que el control del ventilador continúa (patrón de app
-/// de barra de menú, tipo Stats/iStat). El cierre real (Cmd+Q o "Salir")
-/// sigue devolviendo el control al sistema.
+/// Keeps the app alive in the menu bar when the window is closed
+/// so that fan control continues (menu-bar app
+/// (menu bar app, like Stats/iStat). Real closing (Cmd+Q or "Quit")
+/// keeps returning control to the system.
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // App sin Dock (LSUIElement): crear un menú mínimo para que Cmd+Q
-        // cierre la app igualmente.
+        // App without Dock (LSUIElement): create a minimal menu so Cmd+Q
+        // closes the app anyway.
         let mainMenu = NSMenu()
         let appMenuItem = NSMenuItem()
         mainMenu.addItem(appMenuItem)
         let appMenu = NSMenu()
         let quitItem = NSMenuItem(
-            title: "Salir de FanCTL",
+            title: "Quit FanCTL",
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
         )
@@ -38,8 +38,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// Intercepta el cierre de la ventana principal para ocultarla en vez de
-/// destruirla: la vista y el bucle de control siguen vivos en segundo plano.
+/// Intercepts the main window close to hide it instead of
+/// destroying it: the view and control loop stay alive in the background.
 struct WindowCloseHider: NSViewRepresentable {
     final class Coordinator: NSObject, NSWindowDelegate {
         func windowShouldClose(_ sender: NSWindow) -> Bool {

@@ -1,17 +1,17 @@
 import Foundation
 
-/// Cálculo del objetivo de velocidad de un ventilador según la temperatura.
+/// Computation of a fan's target speed based on temperature.
 ///
-/// De los sensores seleccionados para el ventilador se toma la temperatura
-/// máxima. Ese valor se normaliza contra el rango [minTemperature, maxTemperature]
-/// (por debajo del mínimo → 0, por encima del máximo → 1) y ese factor se aplica
-/// al rango de velocidades del ventilador (minRPM...maxRPM).
+/// Of the sensors selected for the fan, the maximum temperature is taken.
+/// That value is normalized against the range [minTemperature, maxTemperature]
+/// (below minimum → 0, above maximum → 1) and that factor is applied
+/// to the fan's speed range (minRPM...maxRPM).
 struct FanSpeedCalculation {
-    /// Temperatura máxima medida entre los sensores seleccionados (°C).
+    /// Maximum temperature measured among the selected sensors (°C).
     let maxSelectedTemperature: Double?
-    /// Valor normalizado de la temperatura en [0, 1].
+    /// Temperature normalized to [0, 1].
     let normalizedValue: Double
-    /// Velocidad objetivo calculada en RPM.
+    /// Computed target speed in RPM.
     let targetRPM: Double?
 
     static func compute(fan: FanInfo, config: FanSettings, sensors: [SensorInfo]) -> FanSpeedCalculation {
@@ -22,13 +22,13 @@ struct FanSpeedCalculation {
             return FanSpeedCalculation(maxSelectedTemperature: nil, normalizedValue: 0, targetRPM: nil)
         }
 
-        // Normalizar la temperatura al rango configurado, recortando a [0, 1]
+        // Normalize the temperature to the configured range, clamping to [0, 1]
         let tempRange = config.maxTemperature - config.minTemperature
         var normalized = tempRange > 0 ? (maxTemp - config.minTemperature) / tempRange : 0
         normalized = min(1, max(0, normalized))
 
-        // Aplicar el mismo factor al rango de velocidad del ventilador
-        // (o al rango personalizado configurado por el usuario, si existe).
+        // Apply the same factor to the fan's speed range
+        // (or to the user-configured custom range, if any).
         let lowRPM = config.effectiveMinRPM(fanMinRPM: fan.minRPM)
         let highRPM = config.effectiveMaxRPM(fanMaxRPM: fan.maxRPM)
         let speedRange = max(highRPM - lowRPM, 0)

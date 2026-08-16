@@ -1,38 +1,38 @@
 import Foundation
 import IOKit
 
-/// Cliente de bajo nivel de comunicación con AppleSMC.
+/// Low-level client for communicating with AppleSMC.
 ///
-/// Abre una conexión IOKit con el servicio `AppleSMC` y expone la lectura de
-/// claves del firmware (dos pasos: `GET_KEY_INFO` para conocer tamaño/tipo y
-/// `READ_BYTES` para obtener los datos). Es el único punto que conoce el
-/// `SMCParamStruct` y las constantes del protocolo.
+/// Opens an IOKit connection to the `AppleSMC` service and exposes reading of
+/// firmware keys (two steps: `GET_KEY_INFO` to know size/type and
+/// `READ_BYTES` to get the data). It is the only place that knows the
+/// `SMCParamStruct` and the protocol constants.
 final class SMCClient {
     private var connection: io_connect_t = 0
 
-    /// Abre la conexión con el servicio AppleSMC.
-    /// - Returns: `true` si la conexión quedó disponible para leer claves.
+    /// Opens the connection to the AppleSMC service.
+    /// - Returns: `true` if the connection became available for reading keys.
     @discardableResult
     func open() -> Bool {
         guard connection == 0 else { return true }
 
         let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSMC"))
         guard service != 0 else {
-            AppLog.log("[SMCClient] Error: No se encontró el servicio AppleSMC.")
+            AppLog.log("[SMCClient] Error: AppleSMC service not found.")
             return false
         }
         defer { IOObjectRelease(service) }
 
         let result = IOServiceOpen(service, mach_task_self_, 0, &connection)
         if result != kIOReturnSuccess {
-            AppLog.log("[SMCClient] IOServiceOpen falló: \(String(format: "0x%08x", result))")
+            AppLog.log("[SMCClient] IOServiceOpen failed: \(String(format: "0x%08x", result))")
             connection = 0
             return false
         }
         return true
     }
 
-    /// Cierra la conexión con AppleSMC si estaba abierta.
+    /// Closes the connection to AppleSMC if it was open.
     func close() {
         if connection != 0 {
             IOServiceClose(connection)
@@ -40,9 +40,9 @@ final class SMCClient {
         }
     }
 
-    /// Lee los datos crudos de una clave del SMC (ej. "FNum", "Tp01").
-    /// - Parameter key: Nombre de la clave de 4 caracteres.
-    /// - Returns: Datos crudos de la clave, o `nil` si la clave no existe o falla la lectura.
+    /// Reads the raw data of an SMC key (e.g. "FNum", "Tp01").
+    /// - Parameter key: 4-character key name.
+    /// - Returns: raw key data, or `nil` if the key does not exist or reading fails.
     func readKeyData(_ key: String) -> SMCDatum? {
         let keyCode = FourCharCode.fromString(key)
 
@@ -77,11 +77,11 @@ final class SMCClient {
         return SMCDatum(bytes: bytes, type: dataType, size: dataSize)
     }
 
-    /// Escribe datos crudos en una clave del SMC (ej. "F0Md", "F0Mn").
+    /// Writes raw data to an SMC key (e.g. "F0Md", "F0Mn").
     /// - Parameters:
-    ///   - key: Nombre de la clave de 4 caracteres.
-    ///   - bytes: Datos a escribir (tamaño según el tipo de la clave).
-    /// - Returns: `true` si la escritura se completó correctamente.
+    ///   - key: 4-character key name.
+    ///   - bytes: Data to write (size according to the key's type).
+    /// - Returns: `true` if the write completed successfully.
     @discardableResult
     func writeKeyData(_ key: String, bytes: [UInt8]) -> Bool {
         let keyCode = FourCharCode.fromString(key)
@@ -125,7 +125,7 @@ final class SMCClient {
             &outputSize
         )
         if result != kIOReturnSuccess {
-            AppLog.log("[SMCClient] callSMC falló: kr=\(String(format: "0x%08x", result))")
+            AppLog.log("[SMCClient] callSMC failed: kr=\(String(format: "0x%08x", result))")
             return false
         }
         return output.result == SMCConstants.success

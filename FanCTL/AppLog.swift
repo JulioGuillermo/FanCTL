@@ -7,8 +7,8 @@
 
 import Foundation
 
-/// Logger mínimo a archivo para diagnóstico del escáner de ventiladores/sensores.
-/// Escribe en ~/Library/Logs/FanCTL/fanctl.log
+/// Minimal file logger for diagnostics of the fan/sensor scanner.
+/// Writes to ~/Library/Logs/FanCTL/fanctl.log
 enum AppLog {
     private static let fileURL: URL = {
         let dir = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)

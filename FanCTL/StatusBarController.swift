@@ -1,11 +1,12 @@
 import AppKit
 internal import Combine
+import SwiftUI
 
-/// Gestiona el indicador de la barra de menú.
+/// Manages the menu bar indicator.
 ///
-/// El icono aparece únicamente mientras el daemon privilegiado está activo y
-/// muestra la temperatura máxima y las RPM de los ventiladores junto al icono,
-/// además de un menú con acciones rápidas.
+/// The icon only appears while the privileged daemon is active and
+/// shows the max temperature and fan RPMs next to the icon,
+/// plus a menu with quick actions.
 final class StatusBarController: ObservableObject {
     private var statusItem: NSStatusItem?
     private let daemon: FanDaemonClient
@@ -20,18 +21,13 @@ final class StatusBarController: ObservableObject {
         self.monitor = monitor
 
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        if let button = item.button {
-            button.image = NSImage(systemSymbolName: "fanblades.fill", accessibilityDescription: "FanCTL")
-            button.image?.isTemplate = true
-        }
-        item.isVisible = false
         statusItem = item
 
         menuTarget.onStopDaemon = { [weak self] in
             self?.daemon.stopDaemon()
         }
 
-        // Icono solo mientras el daemon está disponible.
+        // Icon only while the daemon is available.
         daemon.$isAvailable
             .receive(on: RunLoop.main)
             .sink { [weak self] available in
@@ -41,7 +37,7 @@ final class StatusBarController: ObservableObject {
             }
             .store(in: &cancellables)
 
-        // Texto junto al icono: temp máxima y RPM de cada ventilador.
+        // Text next to the icon: max temp and RPM of each fan.
         Publishers.CombineLatest(monitor.$maxTemperature, monitor.$fanSpeeds)
             .receive(on: RunLoop.main)
             .sink { [weak self] _, _ in
@@ -49,7 +45,7 @@ final class StatusBarController: ObservableObject {
             }
             .store(in: &cancellables)
 
-        // Mantener las RPM al día en el menú.
+        // Keep the RPMs up to date in the menu.
         fanController.$appliedSpeeds
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
@@ -61,20 +57,50 @@ final class StatusBarController: ObservableObject {
     private func updateStatusTitle() {
         guard let button = statusItem?.button else { return }
         guard daemon.isAvailable else {
-            button.title = ""
+            button.attributedTitle = NSAttributedString()
             return
         }
 
-        var parts: [String] = []
+        let attr = NSMutableAttributedString()
+
+        // Temperature icon (by tier) + value
         if let max = monitor.maxTemperature {
-            parts.append(String(format: "%.1f°C", max))
+            let color = TemperatureIndicator.color(for: max)
+            let symbol = TemperatureIndicator.iconName(for: max)
+            attr.append(NSAttributedString(attachment: attachment(symbol: symbol, size: 13, color: NSColor(color))))
+            attr.append(NSAttributedString(
+                string: String(format: " %.1f°C", max),
+                attributes: [.foregroundColor: NSColor(color)]
+            ))
         }
+
+        // Fan icon + speed
         let rpmValues = monitor.fanSpeeds.keys.sorted().compactMap { monitor.fanSpeeds[$0] }
         if !rpmValues.isEmpty {
+            if attr.length > 0 { attr.append(NSAttributedString(string: "  ")) }
+            attr.append(NSAttributedString(attachment: attachment(symbol: "fanblades.fill", size: 13, color: nil)))
             let rpmText = rpmValues.map { String(Int($0)) }.joined(separator: "/")
-            parts.append("\(rpmText) RPM")
+            attr.append(NSAttributedString(string: " \(rpmText)"))
         }
-        button.title = parts.joined(separator: "  ")
+
+        button.attributedTitle = attr
+    }
+
+    private func attachment(symbol: String, size: CGFloat, color: NSColor?) -> NSTextAttachment {
+        let base = NSImage(systemSymbolName: symbol, accessibilityDescription: nil) ?? NSImage()
+        var image = base
+        if let color {
+            let config = NSImage.SymbolConfiguration(pointSize: size, weight: .regular)
+                .applying(.init(paletteColors: [color]))
+            image = base.withSymbolConfiguration(config) ?? base
+        } else {
+            image = base.withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: size, weight: .regular)) ?? base
+            image.isTemplate = true
+        }
+        let attachment = NSTextAttachment()
+        attachment.image = image
+        attachment.bounds = CGRect(x: 0, y: -2, width: size, height: size)
+        return attachment
     }
 
     private func updateMenu() {
@@ -82,7 +108,7 @@ final class StatusBarController: ObservableObject {
         let menu = NSMenu()
         menu.autoenablesItems = false
 
-        var headerTitle = "FanCTL — Daemon activo"
+        var headerTitle = "FanCTL — Daemon active"
         if let max = monitor.maxTemperature {
             headerTitle += String(format: " · %.1f°C", max)
         }
@@ -95,7 +121,7 @@ final class StatusBarController: ObservableObject {
             menu.addItem(.separator())
             for index in fans {
                 let item = NSMenuItem(
-                    title: "Ventilador \(index): \(Int(fanController.appliedSpeeds[index] ?? 0)) RPM",
+                    title: "Fan \(index): \(Int(fanController.appliedSpeeds[index] ?? 0)) RPM",
                     action: nil,
                     keyEquivalent: ""
                 )
@@ -105,16 +131,16 @@ final class StatusBarController: ObservableObject {
         }
 
         menu.addItem(.separator())
-        let open = NSMenuItem(title: "Abrir FanCTL", action: #selector(AppMenuTarget.openMainWindow), keyEquivalent: "o")
+        let open = NSMenuItem(title: "Open FanCTL", action: #selector(AppMenuTarget.openMainWindow), keyEquivalent: "o")
         open.target = menuTarget
         menu.addItem(open)
 
-        let stop = NSMenuItem(title: "Detener daemon", action: #selector(AppMenuTarget.stopDaemon), keyEquivalent: "")
+        let stop = NSMenuItem(title: "Stop daemon", action: #selector(AppMenuTarget.stopDaemon), keyEquivalent: "")
         stop.target = menuTarget
         menu.addItem(stop)
 
         menu.addItem(.separator())
-        let quit = NSMenuItem(title: "Salir de FanCTL", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        let quit = NSMenuItem(title: "Quit FanCTL", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         quit.target = NSApp
         menu.addItem(quit)
 
@@ -122,7 +148,7 @@ final class StatusBarController: ObservableObject {
     }
 }
 
-/// Objetivo de las acciones del menú de la barra de estado.
+/// Target of the status bar menu actions.
 private final class AppMenuTarget: NSObject {
     var onStopDaemon: () -> Void = {}
 

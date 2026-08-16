@@ -1,9 +1,9 @@
 import Foundation
 
-/// Servicio de alto nivel para lectura de ventiladores a través del SMC.
+/// High-level service for reading fans through the SMC.
 ///
-/// Expone la lista completa de ventiladores con todas sus métricas. Internamente
-/// usa un `SMCClient` compartido y delega el parseo de RPM en `FanDataParser`.
+/// Exposes the full list of fans with all their metrics. Internally
+/// uses a shared `SMCClient` and delegates RPM parsing to `FanDataParser`.
 final class FansReader {
     private let client: SMCClient
 
@@ -11,21 +11,21 @@ final class FansReader {
         self.client = client
     }
 
-    /// Devuelve la lista completa de ventiladores instalados con sus métricas.
-    /// - Returns: `[FanInfo]` con un elemento por ventilador detectado.
+    /// Returns the full list of installed fans with their metrics.
+    /// - Returns: `[FanInfo]` with one element per fan detectado.
     func readAllFans() -> [FanInfo] {
         guard client.open() else { return [] }
         defer { client.close() }
 
         var fansList: [FanInfo] = []
 
-        // 1. Obtener la cantidad total de ventiladores leyendo la clave 'FNum'.
+        // 1. Get the total number of fans by reading the 'FNum' key.
         var fanCount = 0
         if let numData = client.readKeyData("FNum"), !numData.bytes.isEmpty {
             fanCount = Int(numData.bytes[0])
         }
 
-        // 2. Fallback: si FNum devuelve 0, sondear directamente la existencia de F0Ac, F1Ac...
+        // 2. Fallback: if FNum returns 0, probe directly for the existence of F0Ac, F1Ac...
         if fanCount == 0 {
             for i in 0..<4 {
                 if client.readKeyData("F\(i)Ac") != nil {
@@ -36,9 +36,9 @@ final class FansReader {
             }
         }
 
-        AppLog.log("[FansReader] Ventiladores físicos detectados: \(fanCount)")
+        AppLog.log("[FansReader] Physical fans detected: \(fanCount)")
 
-        // 3. Iterar leyendo las claves de cada ventilador.
+        // 3. Iterate reading each fan's keys.
         for i in 0..<fanCount {
             let actualKey = "F\(i)Ac"
             let minKey    = "F\(i)Mn"
@@ -52,7 +52,7 @@ final class FansReader {
 
             fansList.append(FanInfo(
                 id: i,
-                name: fanCount == 1 ? "Ventilador Principal" : "Ventilador \(i + 1)",
+                name: fanCount == 1 ? "Main Fan" : "Fan \(i + 1)",
                 currentRPM: actual,
                 minRPM: minVal,
                 maxRPM: maxVal,

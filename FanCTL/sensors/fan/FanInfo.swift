@@ -1,35 +1,35 @@
 import SwiftUI
 
-/// Estructura de modelo con todas las métricas de un ventilador.
+/// Model structure with all metrics of a fan.
 struct FanInfo: Identifiable, Hashable, Codable {
-    let id: Int               // Índice del ventilador (0, 1, 2...)
-    let name: String          // Nombre legible (ej. "Ventilador Principal")
-    let currentRPM: Double    // Velocidad actual medida en RPM
-    let minRPM: Double        // Velocidad mínima permitida por el firmware
-    let maxRPM: Double        // Velocidad máxima permitida por el firmware
-    let targetRPM: Double?    // Velocidad objetivo configurada por macOS
-    let mode: FanMode         // Modo actual de funcionamiento
+    let id: Int               // Fan index (0, 1, 2...)
+    let name: String          // Human-readable name (e.g. "Main Fan")
+    let currentRPM: Double    // Current measured speed in RPM
+    let minRPM: Double        // Minimum speed allowed by the firmware
+    let maxRPM: Double        // Maximum speed allowed by the firmware
+    let targetRPM: Double?    // Target speed set by macOS
+    let mode: FanMode         // Current operating mode
 
-    /// Porcentaje relativo de velocidad actual respecto al rango (0.0 a 1.0)
+    /// Relative percentage of the current speed within the range (0.0 to 1.0)
     var percentage: Double {
         let totalRange = max(1.0, maxRPM - minRPM)
         let currentProgress = (currentRPM - minRPM) / totalRange
         return min(1.0, max(0.0, currentProgress))
     }
 
-    /// Porcentaje formateado para visualización (0 - 100%)
+    /// Formatted percentage for display (0 - 100%)
     var percentageString: String {
         return String(format: "%.0f%%", percentage * 100.0)
     }
 
-    /// Estado térmico visual sugerido según las RPMs
+    /// Suggested visual thermal status based on RPMs
     var statusColor: Color {
         if currentRPM <= minRPM + 200 {
-            return .blue      // En reposo / silencioso
+            return .blue      // Idle / quiet
         } else if currentRPM < (maxRPM * 0.75) {
-            return .orange    // Carga moderada
+            return .orange    // Moderate load
         } else {
-            return .red       // Carga alta / máximo rendimiento
+            return .red       // High load / maximum performance
         }
     }
 }

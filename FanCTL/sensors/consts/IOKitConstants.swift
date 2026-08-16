@@ -1,11 +1,11 @@
 import IOKit
 
-/// Puerto principal de IOKit para la tarea actual (equivale a `MACH_PORT_NULL`).
+/// Main IOKit port for the current task (equivale a `MACH_PORT_NULL`).
 var kIOMainPortDefault: io_object_t {
     return io_object_t(MACH_PORT_NULL)
 }
 
-/// Resultados de IOKit tipados para comodidad.
+/// Typed IOKit results for convenience.
 @objc enum IOStatus: Int {
     case success = 32768 // 0x8001
 }
