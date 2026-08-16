@@ -64,6 +64,7 @@ struct ContentView: View {
             }
         }
         .navigationTitle("FanCTL")
+        .preferredColorScheme(.dark)
         .frame(minWidth: 960, minHeight: 640)
         .onAppear {
             fanController.checkPrivileges()
@@ -479,22 +480,25 @@ struct RightPanelFansView: View {
             // Fan list (takes all available space)
             if !fans.isEmpty {
                 ScrollView {
-                    VStack(spacing: 12) {
-                        ForEach(fans) { fan in
-                            FanRowView(
-                                fan: fan,
-                                mode: modeFor(fan),
-                                desiredRPM: desiredRPMFor(fan),
-                                manualRPM: manualRPMFor(fan),
-                                minSpeedRPM: minSpeedRPMFor(fan),
-                                maxSpeedRPM: maxSpeedRPMFor(fan),
-                                controlActive: controlActive,
-                                isRequestingPermissions: isRequestingPermissions,
-                                onChangeMode: { onChangeMode(fan, $0) },
-                                onManualRPMChange: { onManualRPMChange(fan, $0) },
-                                onRequestControl: onRequestControl,
-                                onSettings: { onFanSettings(fan) }
-                            )
+                    // Group the glass cards so they blend as a single material
+                    GlassEffectContainer(spacing: 12) {
+                        VStack(spacing: 12) {
+                            ForEach(fans) { fan in
+                                FanRowView(
+                                    fan: fan,
+                                    mode: modeFor(fan),
+                                    desiredRPM: desiredRPMFor(fan),
+                                    manualRPM: manualRPMFor(fan),
+                                    minSpeedRPM: minSpeedRPMFor(fan),
+                                    maxSpeedRPM: maxSpeedRPMFor(fan),
+                                    controlActive: controlActive,
+                                    isRequestingPermissions: isRequestingPermissions,
+                                    onChangeMode: { onChangeMode(fan, $0) },
+                                    onManualRPMChange: { onManualRPMChange(fan, $0) },
+                                    onRequestControl: onRequestControl,
+                                    onSettings: { onFanSettings(fan) }
+                                )
+                            }
                         }
                     }
                     .padding(.horizontal)
@@ -521,7 +525,6 @@ struct RightPanelFansView: View {
 
             Spacer()
         }
-        .background(.ultraThinMaterial)
     }
 }
 
