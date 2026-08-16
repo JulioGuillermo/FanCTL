@@ -348,12 +348,17 @@ private struct SensorSelectionRow: View {
                 .bold()
                 .strikethrough(!isSelected, color: .secondary)
 
+            Text(SensorDescriptions.shortName(for: sensor.rawKey))
+                .font(.caption2)
+                .foregroundColor(.secondary)
+
             Spacer()
 
             Text(String(format: "%.1f °C", sensor.value))
                 .font(.system(.body, design: .monospaced))
                 .foregroundColor(.secondary)
         }
+        .help(sensor.descriptionText)
         .padding(.vertical, 2)
     }
 }

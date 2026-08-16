@@ -468,10 +468,11 @@ struct SensorRowView: View {
                     .font(.system(.body, design: .monospaced))
                     .bold()
 
-                Text(sensor.source.rawValue)
+                Text("\(SensorDescriptions.shortName(for: sensor.rawKey)) · \(sensor.source.rawValue)")
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
+            .help(sensor.descriptionText)
 
             Spacer()
 

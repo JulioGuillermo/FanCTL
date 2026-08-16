@@ -78,20 +78,19 @@ final class HIDSensorReader {
                     let temp = eventGetFloatValue(event, 15 << 16)
                     if temp > 0 && temp < 130 {
                         let category: SensorCategory
-                        let explanation: String
 
                         if rawName.contains("tdie") {
                             category = .socDie
-                            explanation = "Sensor incrustado en el silicio del procesador (SoC M4). Mide núcleos de CPU (P-Core/E-Core), GPU o Neural Engine."
                         } else if rawName.contains("tdev") {
                             category = .pmuBoard
-                            explanation = "Sensor periférico en la placa madre / circuito PMIC de administración de energía."
+                        } else if rawName.contains("tcal") {
+                            category = .powerManagement
+                        } else if rawName.contains("nand") {
+                            category = .storage
                         } else if rawName.contains("TB") || rawName.lowercased().contains("bat") {
                             category = .battery
-                            explanation = "Sensor térmico situado en la batería o controlador de carga."
                         } else {
                             category = .unknown
-                            explanation = "Sensor reportado por la interfaz IOHID ThermalZone de macOS."
                         }
 
                         let info = SensorInfo(
@@ -103,7 +102,7 @@ final class HIDSensorReader {
                             thermalZone: zoneProp ?? "PMU Zone",
                             usagePage: usagePageProp ?? 0xFF00,
                             usage: usageProp ?? 5,
-                            descriptionText: explanation
+                            descriptionText: SensorDescriptions.description(for: rawName, category: category)
                         )
 
                         // Evitar duplicados por nombre
