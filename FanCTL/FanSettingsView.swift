@@ -131,14 +131,13 @@ struct FanSettingsView: View {
                     .font(.caption)
 
                     if !temperatureSensors.isEmpty {
-                        List(sortedSensors(temperatureSensors, by: sortMode), id: \.id) { sensor in
-                            SensorCheckRow(
-                                sensor: sensor,
-                                isSelected: config.selectedSensorKeys.contains(sensor.id),
-                                onToggle: { toggle(sensor) }
-                            )
-                        }
-                        .listStyle(.plain)
+                        SensorSelectionList(
+                            sensors: temperatureSensors,
+                            sortMode: $sortMode,
+                            isSelected: { config.selectedSensorKeys.contains($0.id) },
+                            onToggle: { toggle($0) },
+                            onSetSelected: { setSelected($0, selected: $1) }
+                        )
                         .frame(minHeight: 240, maxHeight: 320)
                         .clipped()
                     } else {
@@ -360,6 +359,18 @@ struct FanSettingsView: View {
             config.selectedSensorKeys.remove(at: index)
         } else {
             config.selectedSensorKeys.append(sensor.id)
+        }
+    }
+
+    private func setSelected(_ sensors: [SensorInfo], selected: Bool) {
+        for sensor in sensors {
+            if selected {
+                if !config.selectedSensorKeys.contains(sensor.id) {
+                    config.selectedSensorKeys.append(sensor.id)
+                }
+            } else {
+                config.selectedSensorKeys.removeAll { $0 == sensor.id }
+            }
         }
     }
 

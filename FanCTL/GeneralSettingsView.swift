@@ -96,14 +96,13 @@ struct GeneralSettingsView: View {
                     }
                     .font(.caption)
 
-                    List(sortedSensors(temperatureSensors, by: sortMode), id: \.id) { sensor in
-                        SensorCheckRow(
-                            sensor: sensor,
-                            isSelected: store.settings.maxTempSensorKeys.contains(sensor.id),
-                            onToggle: { toggleMaxTempSensor(sensor) }
-                        )
-                    }
-                    .listStyle(.plain)
+                    SensorSelectionList(
+                        sensors: temperatureSensors,
+                        sortMode: $sortMode,
+                        isSelected: { store.settings.maxTempSensorKeys.contains($0.id) },
+                        onToggle: { toggleMaxTempSensor($0) },
+                        onSetSelected: { setMaxTempSensors($0, selected: $1) }
+                    )
                     .frame(minHeight: 200, maxHeight: 300)
                     .clipped()
                 } else {
@@ -245,6 +244,20 @@ struct GeneralSettingsView: View {
             keys.remove(at: index)
         } else {
             keys.append(sensor.id)
+        }
+        store.setMaxTempSensorKeys(keys)
+    }
+
+    private func setMaxTempSensors(_ sensors: [SensorInfo], selected: Bool) {
+        var keys = store.settings.maxTempSensorKeys
+        if selected {
+            for sensor in sensors where !keys.contains(sensor.id) {
+                keys.append(sensor.id)
+            }
+        } else {
+            for sensor in sensors {
+                keys.removeAll { $0 == sensor.id }
+            }
         }
         store.setMaxTempSensorKeys(keys)
     }
