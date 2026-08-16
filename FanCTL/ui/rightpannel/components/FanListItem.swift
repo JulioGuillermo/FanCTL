@@ -127,6 +127,7 @@ public struct FanListItem: View {
         )
         .glassEffect(
             .clear,
+//            .regular,
             in: RoundedRectangle(cornerRadius: 14)
         )
         .overlay {
