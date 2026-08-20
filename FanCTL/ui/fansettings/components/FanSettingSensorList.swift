@@ -48,6 +48,7 @@ public struct FanSettingSensorList: View {
                     .foregroundColor(.secondary)
             }
         }
+        .padding(10)
         .frame(
             maxWidth: .infinity,
             maxHeight: .infinity,

@@ -47,5 +47,6 @@ public struct FanSettingMode: View {
                     .foregroundColor(.secondary)
             }
         }
+        .padding(10)
     }
 }

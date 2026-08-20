@@ -12,13 +12,15 @@ public struct FanSettingManualSpeedSection: View {
     let effMin: Double
     let effMax: Double
     @Binding var config: FanSettings
-    
+
     public var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text("Fixed speed")
                     .foregroundColor(.secondary)
+
                 Spacer()
+
                 TextField(
                     "RPM",
                     value: Binding(
@@ -27,7 +29,7 @@ public struct FanSettingManualSpeedSection: View {
                     ),
                     format: .number
                 )
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.plain)
                 .frame(width: 80)
                 .multilineTextAlignment(.trailing)
             }
