@@ -1,7 +1,13 @@
+//
+//  FanListItem.swift
+//  FanCTL
+//
+//  Created by Julio Guillermo Mayo Vidal on 16/08/2026.
+//
+
 import SwiftUI
 
-/// UI component to display and control a fan.
-struct FanRowView: View {
+public struct FanListItem: View {
     let fan: FanInfo
     var mode: FanMode = .automatic
     var desiredRPM: Double? = nil
@@ -15,65 +21,34 @@ struct FanRowView: View {
     var onRequestControl: () -> Void = {}
     var onSettings: () -> Void = {}
 
-    var body: some View {
+    public var body: some View {
         VStack(spacing: 8) {
-            HStack {
-                SpinningFanIcon(id: String(fan.id), percentage: fan.percentage)
-                    .foregroundColor(fan.statusColor)
-                    .font(.system(size: 16))
+            FanMainInfo(fan: fan, onSettings: onSettings)
 
-                Text(fan.name)
-                    .bold()
-                    .font(.body)
-
-                Spacer()
-
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text("\(Int(fan.currentRPM))")
-                        .font(.system(.title3, design: .monospaced))
-                        .bold()
-                        .foregroundColor(fan.statusColor)
-
-                    Text("RPM")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-
-                Button(action: onSettings) {
-                    Image(systemName: "gearshape")
-                        .font(.title3)
-                        .foregroundColor(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help("Settings for \(fan.name)")
-            }
-
-            // Control mode selector (visible and direct)
-            Picker("Mode", selection: Binding(
-                get: { mode },
-                set: { onChangeMode($0) }
-            )) {
-                ForEach(FanMode.allCases, id: \.self) { candidate in
-                    Label(candidate.rawValue, systemImage: candidate.iconName)
-                        .tag(candidate)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+            SelectorLiquidGlass(
+                mode: Binding(
+                    get: { mode },
+                    set: { onChangeMode($0) }
+                ),
+                onChange: onChangeMode
+            )
 
             // Manual speed slider
             if mode == .manual {
-            HStack(spacing: 10) {
-                Text("Speed")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                HStack(spacing: 10) {
+                    Text("Speed")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
 
                     Slider(
                         value: Binding(
                             get: { manualRPM },
                             set: { onManualRPMChange($0) }
                         ),
-                        in: (minSpeedRPM ?? fan.minRPM)...max((maxSpeedRPM ?? fan.maxRPM), (minSpeedRPM ?? fan.minRPM)),
+                        in: (minSpeedRPM ?? fan.minRPM)...max(
+                            (maxSpeedRPM ?? fan.maxRPM),
+                            (minSpeedRPM ?? fan.minRPM)
+                        ),
                         step: 50
                     )
 
@@ -85,31 +60,17 @@ struct FanRowView: View {
                 }
             }
 
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.secondary.opacity(0.15))
-                        .frame(height: 8)
-
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.blue, fan.statusColor],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: geo.size.width * CGFloat(fan.percentage), height: 8)
-                }
-            }
-            .frame(height: 8)
+            FanPercentageIndicator(percentage: fan.percentage)
 
             // Speed being applied according to the mode
             if let desired = desiredRPM {
                 HStack {
-                    Label(String(format: "Control: %d RPM", Int(desired)), systemImage: mode.iconName)
-                        .bold()
-                        .foregroundColor(controlActive ? .blue : .secondary)
+                    Label(
+                        String(format: "Control: %d RPM", Int(desired)),
+                        systemImage: mode.iconName
+                    )
+                    .bold()
+                    .foregroundColor(controlActive ? .blue : .secondary)
 
                     Spacer()
 
@@ -123,7 +84,7 @@ struct FanRowView: View {
                             .font(.caption2)
                         } else {
                             Button("Start control") { onRequestControl() }
-                                .buttonStyle(.bordered)
+                                .buttonStyle(.glass)
                                 .controlSize(.small)
                         }
                     }
@@ -148,20 +109,48 @@ struct FanRowView: View {
 
                 Text(fan.percentageString)
                     .bold()
-                    .foregroundColor(fan.statusColor)
+                    .foregroundColor(
+                        TemperatureIndicator.fluidColorB(
+                            forPercentage: fan.percentage
+                        )
+                    )
             }
             .font(.caption2)
             .foregroundColor(.secondary)
         }
         .padding(12)
-        .background(Color.secondary.opacity(0.08))
-        .cornerRadius(12)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(
+                    GlassPannelColor
+                )
+        )
+        .glassEffect(
+            .clear,
+//            .regular,
+            in: RoundedRectangle(cornerRadius: 14)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            .white.opacity(0.50),
+                            .white.opacity(0.15),
+                            .black.opacity(0.30),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 5
+                )
+        }
     }
 }
 
 #Preview {
     VStack(spacing: 12) {
-        FanRowView(
+        FanListItem(
             fan: FanInfo(
                 id: 0,
                 name: "Main Fan",
@@ -177,7 +166,7 @@ struct FanRowView: View {
             controlActive: true
         )
 
-        FanRowView(
+        FanListItem(
             fan: FanInfo(
                 id: 1,
                 name: "Secondary Fan (GPU)",

@@ -2,7 +2,7 @@
 
 Thermal monitoring and fan control for Macs with Apple Silicon.
 
-![FanCTL](ScreenShot.png)
+![FanCTL](ScreenShot_lg.png)
 
 ## What it does
 
@@ -73,7 +73,8 @@ FanCTL/
 ├── FanDaemon/              # Privileged SMC control daemon
 ├── scripts/                # Packaging scripts
 ├── icon.png                # App icon
-└── ScreenShot.png
+├── ScreenShot.png          # Legacy screenshot
+└── ScreenShot_lg.png       # Main screenshot (Liquid Glass)
 ```
 
 ## Disclaimer

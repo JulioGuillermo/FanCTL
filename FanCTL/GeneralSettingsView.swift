@@ -1,5 +1,5 @@
-import SwiftUI
 import ServiceManagement
+import SwiftUI
 
 /// App general settings sheet: rescan interval,
 /// temperature indicator and fan control via the privileged daemon.
@@ -7,7 +7,7 @@ struct GeneralSettingsView: View {
     @ObservedObject var store: SettingsStore
     @ObservedObject var daemon: FanDaemonClient
     let sensors: [SensorInfo]
-    @Environment(\.dismiss) var dismiss
+    var onClose: () -> Void = {}
 
     @State private var sortMode: SensorSortMode = .alphabetical
 
@@ -27,7 +27,8 @@ struct GeneralSettingsView: View {
                     .font(.title2)
                     .bold()
                 Spacer()
-                Button("Close") { dismiss() }
+                Button("Close") { onClose() }
+                    .buttonStyle(.glass)
             }
 
             Divider()
@@ -40,13 +41,20 @@ struct GeneralSettingsView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
 
-                Picker("Interval", selection: Binding(
-                    get: { store.settings.refreshInterval },
-                    set: { store.setRefreshInterval($0) }
-                )) {
+                Picker(
+                    "Interval",
+                    selection: Binding(
+                        get: { store.settings.refreshInterval },
+                        set: { store.setRefreshInterval($0) }
+                    )
+                ) {
                     ForEach(intervalOptions, id: \.self) { seconds in
-                        Text(seconds < 1 ? "0.5 seconds" : (seconds == 1 ? "1 second" : "\(Int(seconds)) seconds"))
-                            .tag(seconds)
+                        Text(
+                            seconds < 1
+                                ? "0.5 seconds"
+                                : (seconds == 1 ? "1 second" : "\(Int(seconds)) seconds")
+                        )
+                        .tag(seconds)
                     }
                 }
                 .pickerStyle(.menu)
@@ -58,16 +66,22 @@ struct GeneralSettingsView: View {
                 Text("Max temperature indicator")
                     .font(.headline)
 
-                Text("Choose which sensors feed the max temperature shown at the top and in the menu bar. If none are selected, the hottest sensor is used.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                Text(
+                    "Choose which sensors feed the max temperature shown at the top and in the menu bar. If none are selected, the hottest sensor is used."
+                )
+                .font(.caption)
+                .foregroundColor(.secondary)
 
                 HStack {
                     Button(action: { store.setMaxTempSensorKeys([]) }) {
                         HStack(spacing: 10) {
-                            Image(systemName: store.settings.maxTempSensorKeys.isEmpty ? "checkmark.square.fill" : "square")
-                                .font(.title3)
-                                .foregroundColor(store.settings.maxTempSensorKeys.isEmpty ? .blue : .secondary)
+                            Image(
+                                systemName: store.settings.maxTempSensorKeys.isEmpty
+                                    ? "checkmark.square.fill" : "square"
+                            )
+                            .font(.title3)
+                            .foregroundColor(
+                                store.settings.maxTempSensorKeys.isEmpty ? .blue : .secondary)
                             Image(systemName: "sparkles")
                                 .font(.body)
                                 .foregroundColor(.blue)
@@ -75,7 +89,8 @@ struct GeneralSettingsView: View {
                             Text("Automatic (hottest sensor)")
                                 .font(.system(.body))
                                 .bold()
-                                .strikethrough(!store.settings.maxTempSensorKeys.isEmpty, color: .secondary)
+                                .strikethrough(
+                                    !store.settings.maxTempSensorKeys.isEmpty, color: .secondary)
                         }
                     }
                     .buttonStyle(.plain)
@@ -87,9 +102,11 @@ struct GeneralSettingsView: View {
 
                 if !temperatureSensors.isEmpty {
                     HStack {
-                        Text("Sensors: \(store.settings.maxTempSensorKeys.count)/\(temperatureSensors.count)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        Text(
+                            "Sensors: \(store.settings.maxTempSensorKeys.count)/\(temperatureSensors.count)"
+                        )
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                         Spacer()
                         Button("All") { store.setMaxTempSensorKeys(temperatureSensors.map(\.id)) }
                         Button("None") { store.setMaxTempSensorKeys([]) }
@@ -118,9 +135,11 @@ struct GeneralSettingsView: View {
                 Text("FanCTL Daemon")
                     .font(.headline)
 
-                Text("A privileged daemon writes the speed to the SMC. The Start button asks for your administrator password the first time.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                Text(
+                    "A privileged daemon writes the speed to the SMC. The Start button asks for your administrator password the first time."
+                )
+                .font(.caption)
+                .foregroundColor(.secondary)
 
                 HStack(spacing: 8) {
                     Circle()
@@ -158,12 +177,14 @@ struct GeneralSettingsView: View {
 
                 Button(action: { daemon.toggle() }) {
                     HStack {
-                        Image(systemName: daemon.isAvailable ? "stop.circle.fill" : "play.circle.fill")
+                        Image(
+                            systemName: daemon.isAvailable ? "stop.circle.fill" : "play.circle.fill"
+                        )
                         Text(primaryButtonTitle)
                             .frame(maxWidth: .infinity)
                     }
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.glassProminent)
                 .tint(daemon.isAvailable ? .red : .blue)
                 .disabled(daemon.isRequestingPermissions)
 
@@ -200,7 +221,9 @@ struct GeneralSettingsView: View {
 
     private var buildDateText: String {
         guard let url = Bundle.main.executableURL,
-              let mtime = try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate else {
+            let mtime = try? url.resourceValues(forKeys: [.contentModificationDateKey])
+                .contentModificationDate
+        else {
             return "unknown"
         }
         return mtime.formatted(date: .abbreviated, time: .shortened)

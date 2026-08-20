@@ -61,6 +61,9 @@ struct SensorSortMenu: View {
             }
         }
         .pickerStyle(.menu)
+        .buttonStyle(.glass)
+        .controlSize(.small)
+        .tint(.blue)
         .fixedSize()
         .help("Sort order")
     }
@@ -118,6 +121,7 @@ struct SensorSelectionList: View {
             )
         }
         .listStyle(.plain)
+        .scrollContentBackground(.hidden)
     }
 
     private var groupedList: some View {
@@ -150,6 +154,7 @@ struct SensorSelectionList: View {
             }
         }
         .listStyle(.plain)
+        .scrollContentBackground(.hidden)
     }
 
     private func toggleExpansion(_ category: String) {
@@ -213,6 +218,7 @@ private struct GroupHeaderView: View {
         .contentShape(Rectangle())
         .onTapGesture { onToggleExpansion() }
         .padding(.vertical, 2)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6))
     }
 }
 
