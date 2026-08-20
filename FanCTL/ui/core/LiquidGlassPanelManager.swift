@@ -26,7 +26,10 @@ final class LiquidGlassPanelManager {
     private var panel: TransparentLiquidPanel?
 
     /// Presents `content` in a new floating panel centered over `parentWindow`.
-    func present<Content: View>(_ content: Content, relativeTo parentWindow: NSWindow?) {
+    func present<Content: View>(
+        _ content: Content,
+        relativeTo parentWindow: NSWindow?
+    ) {
         close()
 
         let hosting = NSHostingController(rootView: content)
@@ -47,9 +50,10 @@ final class LiquidGlassPanelManager {
         newPanel.isReleasedWhenClosed = false
 
         newPanel.contentView = hosting.view
+
         newPanel.layoutIfNeeded()
         let size = hosting.view.fittingSize
-//        newPanel.setContentSize(size)
+        //        newPanel.setContentSize(size)
 
         if let parent = parentWindow {
             let x = parent.frame.midX - size.width / 2

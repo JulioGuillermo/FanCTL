@@ -31,7 +31,7 @@ extension View {
                         lineWidth: 1.5
                     )
             )
-            .shadow(color: .black.opacity(0.4), radius: 20, x: 0, y: 15)
+//            .shadow(color: .black.opacity(0.4), radius: 20, x: 0, y: 15)
     }
 }
 

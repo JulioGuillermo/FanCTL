@@ -33,12 +33,13 @@ public struct FanSettingsView: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            FanSettingsTitle(fanName: fan.name, onClose: onClose)
 
             Divider()
 
-            NavigationSplitView {
+            HStack {
                 VStack {
+                    FanSettingsTitle(fan: fan, onClose: onClose)
+
                     FanSettingSpeedLimits(
                         fan: fan,
                         effMin: effMin,
@@ -63,10 +64,18 @@ public struct FanSettingsView: View {
                         effMax: effMax
                     )
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: .top
+                )
                 .padding(14)
                 .frame(width: 300)
-            } detail: {
+                .glassEffect(
+                    .regular,
+                    in: RoundedRectangle(cornerRadius: 18)
+                )
+
                 VStack {
                     FanSettingMode(mode: $config.mode)
 
@@ -84,12 +93,19 @@ public struct FanSettingsView: View {
 
                         Divider()
 
-                        FanSettingSensorList(temperatureSensors: sensors, config: $config)
+                        FanSettingSensorList(
+                            temperatureSensors: sensors,
+                            config: $config
+                        )
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .padding(10)
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: .topLeading
+                )
             }
+            .padding(10)
         }
         .frame(
             width: 800,
@@ -97,7 +113,8 @@ public struct FanSettingsView: View {
         )
         .onAppear {
             // By default, if there is no saved selection, select all sensors
-            if config.selectedSensorKeys.isEmpty && !temperatureSensors.isEmpty {
+            if config.selectedSensorKeys.isEmpty && !temperatureSensors.isEmpty
+            {
                 config.selectedSensorKeys = temperatureSensors.map(\.id)
             }
             if config.manualRPM < fan.minRPM || config.manualRPM > fan.maxRPM {

@@ -29,7 +29,7 @@ enum TemperatureIndicator {
     }
 
     static func spinSpeed(forPercentage percentage: Double) -> Double {
-        1 + max(0, min(percentage, 1)) * 4
+        1 + max(0, min(percentage, 1)) * 5
     }
     
     static func fluidColorG(forPercentage percentage: Double) -> Color {
