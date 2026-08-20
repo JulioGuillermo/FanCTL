@@ -79,7 +79,5 @@ struct FanSettingSummary: View {
                 }
             }
         }
-        .padding(10)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 10))
     }
 }
